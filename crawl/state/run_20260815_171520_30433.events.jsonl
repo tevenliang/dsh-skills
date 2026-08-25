@@ -1,0 +1,12 @@
+{"ts": "2026-08-15T17:15:20+08:00", "event": "run_started", "date": "20260815"}
+{"ts": "2026-08-15T17:15:22+08:00", "event": "phase_started", "phase": "watchlist"}
+{"ts": "2026-08-15T17:15:22+08:00", "event": "sub_process_spawning", "cmd": ["/Users/tianwenliang/.agents/skills/crawl/../../.venv/bin/python3", "/Users/tianwenliang/.agents/skills/crawl/common-flow/crawl.py", "watchlist", "--date", "20260815"]}
+{"ts": "2026-08-15T17:15:22+08:00", "event": "sub_process_started", "pid": 30439, "cmd": ["/Users/tianwenliang/.agents/skills/crawl/../../.venv/bin/python3", "/Users/tianwenliang/.agents/skills/crawl/common-flow/crawl.py", "watchlist", "--date", "20260815"]}
+{"ts": "2026-08-15T17:31:01+08:00", "event": "sub_process_exited", "phase": "watchlist", "exit_code": 0, "total_elapsed_sec": 939.4}
+{"ts": "2026-08-15T17:31:01+08:00", "event": "phase_finished", "phase": "watchlist", "exit_code": 0, "duration_sec": 939.4}
+{"ts": "2026-08-15T17:31:01+08:00", "event": "phase_started", "phase": "clip"}
+{"ts": "2026-08-15T17:31:01+08:00", "event": "sub_process_spawning", "cmd": ["/Users/tianwenliang/.agents/skills/crawl/../../.venv/bin/python3", "/Users/tianwenliang/.agents/skills/crawl/common-flow/crawl.py", "clip"]}
+{"ts": "2026-08-15T17:31:01+08:00", "event": "sub_process_started", "pid": 31858, "cmd": ["/Users/tianwenliang/.agents/skills/crawl/../../.venv/bin/python3", "/Users/tianwenliang/.agents/skills/crawl/common-flow/crawl.py", "clip"]}
+{"ts": "2026-08-15T17:31:13+08:00", "event": "sub_process_exited", "phase": "clip", "exit_code": 0, "total_elapsed_sec": 11.9}
+{"ts": "2026-08-15T17:31:13+08:00", "event": "phase_finished", "phase": "clip", "exit_code": 0, "duration_sec": 11.9}
+{"ts": "2026-08-15T17:31:13+08:00", "event": "run_finished", "exit_code": 0}

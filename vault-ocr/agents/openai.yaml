@@ -1,0 +1,4 @@
+interface:
+  display_name: "Vault OCR"
+  short_description: "识别 Vault 文章图片并回填 OCR 结果到源文件"
+  default_prompt: "使用 $vault-ocr 对指定 Vault 文章中的图片执行 OCR，并将结果插入原文件图片下方。"

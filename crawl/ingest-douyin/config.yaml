@@ -1,0 +1,96 @@
+USE_VM: false
+LIMIT: 10
+parallel_authors: 4
+transcription:
+  primary: bailian           # 2026-07-20: 用户明确 bailian>>groq>>mlx, 对齐 SKILL.md
+  fallback: local
+  bailian:
+    model: paraformer-8k-v2  # 2026-07-20: 仅 paraformer-8k-v2 仍有免费额度; qwen3-asr-flash-* 暂未对个人账号开放
+    language: zh
+    timeout: 300
+  groq:
+    model: whisper-large-v3
+    max_chunk_seconds: 600
+    max_chunk_bytes: 20971520
+  local:
+    engine: mlx
+    model: base
+    device: cpu
+    compute_type: int8
+    language: zh
+    beam_size: 5
+summarization:
+  model: glm-4-flash
+  endpoint: https://open.bigmodel.cn/api/paas/v4/chat/completions
+  max_tokens: 2048
+  temperature: 0.3
+  min_chars: 300
+  max_body: 8000
+  platforms:
+  - bilibili
+  - douyin
+project_root: /Users/tianwenliang/.agents/skills/crawl
+# vm (发布落点): 双平台走 $VAULT 环境变量 (mac=~/Documents/steven_vault, VM=/home/ubuntu/webdav/steven_vault)
+# publish_vault._vault_base() 自动回退; config 不再写死 vault 路径
+vm:
+  share: /home/ubuntu/webdav/steven_share
+tools:
+  generic:
+    tool: trafilatura
+    enabled: true
+    monitor: true
+    transcribe: false
+  wechat:
+    tool: wechat-fetcher
+    enabled: true
+    monitor: false
+    transcribe: false
+  xiaohongshu:
+    tool: xhs-cli
+    enabled: true
+    monitor: true
+    transcribe: false
+  bilibili:
+    tool: subscription-fetcher
+    enabled: true
+    monitor: true
+    transcribe: true
+  douyin:
+    tool: subscription-fetcher
+    enabled: true
+    monitor: true
+    transcribe: true
+  boss:
+    tool: scrapling
+    enabled: false
+    monitor: false
+    transcribe: false
+  jd:
+    tool: scrapling
+    enabled: true
+    monitor: true
+    transcribe: false
+  linkedin:
+    tool: scrapling
+    enabled: true
+    monitor: true
+    transcribe: false
+  tieba:
+    tool: scrapling
+    enabled: true
+    monitor: true
+    transcribe: false
+tools_registered_disabled:
+- name: opencli-xhs
+  platform: xiaohongshu
+  monitor: true
+- name: markitdown
+  platform: generic
+  monitor: true
+summary_engine: summarize-expert
+opencli:
+  profile: dy2s6y2k
+  chrome_profile_dir: Profile 1
+  chrome_bin: /Applications/Google Chrome.app/Contents/MacOS/Google Chrome
+  startup_wait: 8
+  chrome_user_data_dir: ~/.chrome-xhs-bot-yizhini

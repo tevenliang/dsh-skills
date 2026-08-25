@@ -1,0 +1,117 @@
+#!/bin/bash
+# DeepSeek 余额查询 → JSON 输出
+# 默认禁用：SHOW_DEEPSEEK=1 bash deepseek-check.sh 启用
+# 端点: https://api.deepseek.com/user/balance
+#
+# 从 ~/.agents/credentials/deepseek.json 读 apiKey（小驼峰）
+
+set -u
+SHOW_DEEPSEEK="${SHOW_DEEPSEEK:-0}"  # 1=启用 0=禁用
+
+CRED_FILE="$HOME/.agents/credentials/deepseek.json"
+
+python3 - "$CRED_FILE" "$SHOW_DEEPSEEK" << 'PYEOF'
+import sys, json, subprocess
+from datetime import datetime, timezone, timedelta
+
+cred_file = sys.argv[1]
+enabled = sys.argv[2] == "1"
+CST = timezone(timedelta(hours=8))
+fetched_at = datetime.now(tz=CST).strftime('%Y-%m-%d %H:%M:%S')
+
+if not enabled:
+    print(json.dumps({
+        "disabled": True,
+        "reason": "DeepSeek 模块默认禁用",
+        "enable_command": "SHOW_DEEPSEEK=1 bash ~/.agents/skills/usage-check/scripts/deepseek-check.sh",
+        "fetched_at": fetched_at
+    }, ensure_ascii=False, indent=2))
+    sys.exit(0)
+
+try:
+    with open(cred_file) as f:
+        data = json.load(f)
+        api_key = data.get('apiKey', '') or data.get('api_key', '')
+except FileNotFoundError:
+    print(json.dumps({"error": "凭证文件不存在: " + cred_file}, ensure_ascii=False))
+    sys.exit(1)
+except (json.JSONDecodeError, KeyError) as e:
+    print(json.dumps({"error": "凭证文件解析失败: " + str(e)}, ensure_ascii=False))
+    sys.exit(1)
+
+if not api_key:
+    print(json.dumps({"error": "凭证文件缺少 apiKey 字段"}, ensure_ascii=False))
+    sys.exit(1)
+
+try:
+    result = subprocess.run([
+        "curl", "-s", "--max-time", "15",
+        "-X", "GET", "https://api.deepseek.com/user/balance",
+        "-H", "Authorization: Bearer " + api_key
+    ], capture_output=True, text=True, timeout=20)
+    raw = result.stdout
+except subprocess.TimeoutExpired:
+    print(json.dumps({"error": "API 请求超时"}, ensure_ascii=False))
+    sys.exit(1)
+
+if not raw.strip():
+    print(json.dumps({"error": "API 返回空响应"}, ensure_ascii=False))
+    sys.exit(1)
+
+try:
+    data = json.loads(raw)
+except json.JSONDecodeError as e:
+    print(json.dumps({"error": "JSON 解析失败: " + str(e), "raw_preview": raw[:200]}, ensure_ascii=False))
+    sys.exit(1)
+
+is_available = data.get('is_available')
+balance_infos = data.get('balance_infos', [])
+if not balance_infos:
+    print(json.dumps({"error": "balance_infos 为空", "raw_preview": raw[:200]}, ensure_ascii=False))
+    sys.exit(1)
+
+info = balance_infos[0]
+total = info.get('total_balance', '0')
+granted = info.get('granted_balance', '0')
+topped_up = info.get('topped_up_balance', '0')
+currency = info.get('currency', 'CNY')
+
+# 余额告警阈值（基于总余额）
+def health_for(total_str):
+    try:
+        total = float(total_str)
+    except (ValueError, TypeError):
+        return ("未知", "⚪")
+    if total >= 50:
+        return ("充足", "💚")
+    if total >= 10:
+        return ("正常", "🟡")
+    if total >= 1:
+        return ("偏低", "🔴")
+    return ("即将耗尽", "🚨")
+
+h_text, h_emoji = health_for(total)
+
+if is_available is True:
+    status_text = "可用"
+    status_emoji = "✅"
+elif is_available is False:
+    status_text = "不可用"
+    status_emoji = "🚫"
+else:
+    status_text = "未知"
+    status_emoji = "⚪"
+
+print(json.dumps({
+    "is_available": is_available,
+    "status_text": status_text,
+    "status_emoji": status_emoji,
+    "currency": currency,
+    "total_balance": total,
+    "granted_balance": granted,
+    "topped_up_balance": topped_up,
+    "health": h_text,
+    "health_emoji": h_emoji,
+    "fetched_at": fetched_at
+}, ensure_ascii=False, indent=2))
+PYEOF

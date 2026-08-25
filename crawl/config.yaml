@@ -1,0 +1,99 @@
+LIMIT: 10
+USE_VM: false
+opencli:
+  chrome_bin: /Applications/Google Chrome.app/Contents/MacOS/Google Chrome
+  chrome_profile_dir: Profile 1
+  chrome_user_data_dir: ~/.chrome-xhs-bot-yizhini
+  profile: dy2s6y2k
+  startup_wait: 8
+parallel_authors: 4
+project_root: /Users/tianwenliang/.agents/skills/crawl
+summarization:
+  endpoint: https://open.bigmodel.cn/api/paas/v4/chat/completions
+  max_body: 8000
+  max_tokens: 2048
+  min_chars: 300
+  model: glm-4-flash
+  platforms:
+  - bilibili
+  - douyin
+  temperature: 0.3
+summary_engine: summarize-expert
+tools:
+  bilibili:
+    enabled: true
+    monitor: true
+    tool: subscription-fetcher
+    transcribe: true
+  boss:
+    enabled: false
+    monitor: false
+    tool: scrapling
+    transcribe: false
+  douyin:
+    enabled: true
+    monitor: true
+    tool: subscription-fetcher
+    transcribe: true
+  generic:
+    enabled: true
+    monitor: true
+    tool: trafilatura
+    transcribe: false
+  jd:
+    enabled: true
+    monitor: true
+    tool: scrapling
+    transcribe: false
+  linkedin:
+    enabled: true
+    monitor: true
+    tool: scrapling
+    transcribe: false
+  tieba:
+    enabled: true
+    monitor: true
+    tool: scrapling
+    transcribe: false
+  wechat:
+    enabled: true
+    monitor: false
+    tool: wechat-fetcher
+    transcribe: false
+  xiaohongshu:
+    enabled: true
+    monitor: true
+    tool: xhs-cli
+    transcribe: false
+tools_registered_disabled:
+- monitor: true
+  name: opencli-xhs
+  platform: xiaohongshu
+- monitor: true
+  name: markitdown
+  platform: generic
+transcription:
+  engine: groq  # 2026-08-09 旧配置; 3.1.0 起 bilibili/douyin 转录改走 VM(vm.asr_routing), 此 engine 对两平台已不再调用(仅遗留给其他路径)
+  bailian:
+    fallback_model: fun-asr-mtl-2025-08-25
+    language: zh
+    model: fun-asr-mtl-2025-08-25   # 2026-07-30 改: paraformer-mtl-v1 已耗尽, 换真实可用模型
+    note: ✅ 备用 ASR (Bailian pool, 按 console 实时配额挑选)
+  fallback: local
+  groq:
+    enabled: true   # 2026-07-30 修 recovery 递归 bug 后重开
+    model: whisper-large-v3
+    cooldown_after_429_sec: 120   # 修 #7: 单次 429 cooldown 60s→120s, 减少连续触发
+    cooldown_after_2x429_sec: 300 # 修 #7: 连续 2 次 429 仍 5min, 切 bailian
+    note: ✅ 主路 (2026-07-30 重开, RPM 20 / RPD 2000 / ASH 7200s·h⁻¹)
+  local:
+    device: ane
+    engine: mlx_whisper
+    model: small
+    note: 兜底本地MLX（最慢）
+  primary: groq   # 2026-07-30: groq 重开, primary=groq → bailian → mlx (注意: engine 字段优先级更高, 见上)
+vm:
+  share: /home/ubuntu/webdav/steven_share
+  # crawl 3.1.0: 音频转录交接配置
+  crawl_transcribe_inbox: /home/ubuntu/crawl-transcribe/inbox
+  asr_routing: true    # crawl 3.1.0: bilibili/douyin 转录走 VM(FunASR+Zhipu)；D 阶段 daemon 已验收通过(2026-08-11)

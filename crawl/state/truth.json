@@ -1,0 +1,184 @@
+{
+  "truth": {
+    "run_started_at": null,
+    "run_finished_at": "",
+    "total_elapsed_sec": null,
+    "total_items": 2,
+    "operations": {},
+    "event_counts": {
+      "dedup_lines": 189,
+      "summary_glm_skip": 2,
+      "summary_glm_done": 2,
+      "supervisor_end": 3
+    },
+    "provider_switches": [],
+    "errors": [
+      {
+        "at": "18:05:58+08:00",
+        "severity": "MED",
+        "op": "supervisor_action",
+        "error": "opencli daemon 断连，重启 daemon"
+      },
+      {
+        "at": "18:06:10+08:00",
+        "severity": "MED",
+        "op": "supervisor_action",
+        "error": "opencli daemon 断连，重启 daemon"
+      },
+      {
+        "at": "16:21:40+08:00",
+        "severity": "MED",
+        "op": "supervisor_action",
+        "error": "opencli daemon 断连，重启 daemon"
+      },
+      {
+        "at": "22:08:37+08:00",
+        "severity": "MED",
+        "op": "supervisor_action",
+        "error": "opencli daemon 断连，重启 daemon"
+      },
+      {
+        "at": "22:17:58+08:00",
+        "severity": "MED",
+        "op": "supervisor_action",
+        "error": "opencli daemon 断连，重启 daemon"
+      },
+      {
+        "at": "18:05:58+08:00",
+        "severity": "MED",
+        "op": "supervisor_action",
+        "error": "opencli daemon 断连，重启 daemon"
+      },
+      {
+        "at": "18:06:10+08:00",
+        "severity": "MED",
+        "op": "supervisor_action",
+        "error": "opencli daemon 断连，重启 daemon"
+      },
+      {
+        "at": "16:21:40+08:00",
+        "severity": "MED",
+        "op": "supervisor_action",
+        "error": "opencli daemon 断连，重启 daemon"
+      },
+      {
+        "at": "22:08:37+08:00",
+        "severity": "MED",
+        "op": "supervisor_action",
+        "error": "opencli daemon 断连，重启 daemon"
+      },
+      {
+        "at": "22:17:58+08:00",
+        "severity": "MED",
+        "op": "supervisor_action",
+        "error": "opencli daemon 断连，重启 daemon"
+      }
+    ]
+  },
+  "extras": {
+    "supervisor_pid": "91981",
+    "run_tag": "run_20260825_194411_91954",
+    "start_iso": null,
+    "total_elapsed_text": null,
+    "exit_code": null,
+    "platforms": [
+      {
+        "idx": 1,
+        "total": 6,
+        "name": "小红书",
+        "elapsed_at_enter": "1s"
+      },
+      {
+        "idx": 2,
+        "total": 6,
+        "name": "Boss直聘",
+        "elapsed_at_enter": "41s"
+      },
+      {
+        "idx": 3,
+        "total": 6,
+        "name": "京东",
+        "elapsed_at_enter": "41s"
+      },
+      {
+        "idx": 4,
+        "total": 6,
+        "name": "贴吧",
+        "elapsed_at_enter": "43s"
+      },
+      {
+        "idx": 5,
+        "total": 6,
+        "name": "抖音",
+        "elapsed_at_enter": "1min"
+      },
+      {
+        "idx": 6,
+        "total": 6,
+        "name": "B站",
+        "elapsed_at_enter": "4min"
+      }
+    ],
+    "platform_new_counts": {
+      "小红书": 0,
+      "jd": 6,
+      "tieba": 5,
+      "douyin": 0,
+      "bilibili": 4
+    },
+    "groq_429_records": [],
+    "asr_fatal_records": [],
+    "groq_success_chars": [],
+    "groq_timing_records": [],
+    "wav_to_mp3_records": [],
+    "dedup_count": 45,
+    "extract_audio_records": [],
+    "summary_done_count": 2,
+    "summary_skip_count": 2,
+    "handoff_vm_count": 36
+  },
+  "supervisor_json": {
+    "status": "exited_ok",
+    "exit_code": 0,
+    "total_elapsed": "36s",
+    "last_heartbeat": "2026-08-25T19:53:20+08:00"
+  },
+  "vault_scan": {
+    "bilibili": {
+      "total": 4,
+      "has_transcript": 0
+    },
+    "boss": {
+      "total": 0,
+      "has_transcript": 0
+    },
+    "douyin": {
+      "total": 0,
+      "has_transcript": 0
+    },
+    "jd": {
+      "total": 6,
+      "has_transcript": 0
+    },
+    "linkedin": {
+      "total": 0,
+      "has_transcript": 0
+    },
+    "media": {
+      "total": 0,
+      "has_transcript": 0
+    },
+    "tieba": {
+      "total": 10,
+      "has_transcript": 0
+    },
+    "wechat": {
+      "total": 0,
+      "has_transcript": 0
+    },
+    "xiaohongshu": {
+      "total": 8,
+      "has_transcript": 0
+    }
+  }
+}

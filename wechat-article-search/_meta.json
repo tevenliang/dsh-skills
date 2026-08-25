@@ -1,0 +1,16 @@
+{
+  "name": "wechat-article-search",
+  "description": "搜索微信公众号文章技能。通过微信搜索获取文章列表",
+  "search": true,
+  "requires": {
+    "bins": ["node"],
+    "env": []
+  },
+  "call": {
+    "kind": "shell",
+    "template": "cd /Users/tianwenliang/.agents/skills/Search/wechat-article-search && node scripts/search_wechat.js '<QUERY>' --num 10 --resolve-url",
+    "params": {
+      "QUERY": "string (required)"
+    }
+  }
+}

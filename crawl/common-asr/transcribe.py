@@ -1,0 +1,2147 @@
+import sys, os
+_here = os.path.dirname(os.path.abspath(__file__))
+while _here and not os.path.exists(os.path.join(_here, "_bootstrap.py")):
+    _p = os.path.dirname(_here)
+    if _p == _here:
+        _here = None
+        break
+    _here = _p
+if _here:
+    sys.path.insert(0, _here)
+import _bootstrap
+
+#!/usr/bin/env python3
+"""
+transcribe_local.py — 本地转录模块 v1
+职责: Mac 侧第二棒，从音频/视频获取转录文本。
+策略: Groq Whisper API (优先) → 本地 faster-whisper (fallback)
+
+用法:
+
+import sys as _sys
+from pathlib import Path as _P
+_SKILL_ROOT = str(_P(__file__).resolve().parent.parent)
+if _SKILL_ROOT not in _sys.path:
+    _sys.path.insert(0, _SKILL_ROOT)
+
+  from common.transcribe import transcribe, load_config, USE_VM
+  text, source = transcribe(audio_path_or_url, headers=None)
+  # source: 'groq' | 'local_whisper' | ''
+"""
+
+import os, sys, json, subprocess, tempfile, time, re, faulthandler, urllib.request, shutil
+from pathlib import Path
+
+# 2026-07-29: macOS fork EAGAIN (Errno 35) 重试, xhs/transcribe 等 Popen 抗 fork 压力
+try:
+    from common_supervisor._eagain_retry import popen_with_retry, run_with_retry
+except ImportError:
+    # fallback: 用原生 Popen/run (但 EAGAIN 会直接抛)
+    popen_with_retry = subprocess.Popen
+    run_with_retry = subprocess.run
+
+# 2026-07-22: launchd 环境 PATH 不含 /opt/homebrew/bin，修复 ffmpeg 找不到的问题
+import os as _os
+_orig_path = _os.environ.get("PATH", "")
+if "/opt/homebrew/bin" not in _orig_path:
+    _os.environ["PATH"] = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin" + (":" + _orig_path if _orig_path else "")
+del _os, _orig_path
+
+
+# ─── 路径 ───
+SCRIPT_DIR = Path(__file__).parent
+SKILL_DIR = SCRIPT_DIR.parent
+CONFIG_PATH = SKILL_DIR / "config.yaml"
+STATE_DIR = SKILL_DIR / "state"
+
+# 2026-07-16: 启用 faulthandler -- bailian submit 后 poll hang 时能让 Python 打印栈
+try:
+    faulthandler.disable()  # DISABLED: caused silent exits with mlx
+except Exception:
+    pass
+CREDS_DIR = Path.home() / ".agents" / "credentials"
+GROQ_CRED = CREDS_DIR / "groq.json"
+
+# ─── Groq 状态持久化（修复 fork 后父子进程状态不共享问题）────────
+# 父子进程通过同一个 state 文件同步 Groq cooldown/disabled 状态
+# 格式: {"cooldown_until": float, "disabled": bool, "disabled_reason": str, "consecutive_429": int, "asph_used": float, "asph_window_start": float}
+_GROQ_STATE_FILE = STATE_DIR / "groq_state.json"
+
+def _groq_state_load():
+    """从文件加载 Groq 状态。失败返回默认空状态。"""
+    try:
+        if _GROQ_STATE_FILE.exists():
+            data = json.loads(_GROQ_STATE_FILE.read_text())
+            return data
+    except Exception:
+        pass
+    return {"cooldown_until": 0.0, "disabled": False, "disabled_reason": "", "consecutive_429": 0, "asph_used": 0.0, "asph_window_start": 0.0}
+
+def _groq_state_save(state):
+    """保存 Groq 状态到文件。"""
+    try:
+        _GROQ_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        _GROQ_STATE_FILE.write_text(json.dumps(state, ensure_ascii=False))
+    except Exception:
+        pass  # 静默失败，避免日志噪音
+
+def _groq_state_update(updates):
+    """原子更新 Groq 状态（读-改-写）。"""
+    state = _groq_state_load()
+    state.update(updates)
+    _groq_state_save(state)
+    return state
+
+
+# ═══════════════════════════════════════════════════════
+# 配置加载
+# ═══════════════════════════════════════════════════════
+
+def load_config():
+    """加载 config.yaml"""
+    import yaml
+    if CONFIG_PATH.exists():
+        with open(CONFIG_PATH) as f:
+            return yaml.safe_load(f) or {}
+    return {}
+
+# 模块级 USE_VM (供外部 import)
+USE_VM = load_config().get("USE_VM", False)
+
+def get_groq_key():
+    """读取 Groq API Key"""
+    if GROQ_CRED.exists():
+        try:
+            return json.loads(GROQ_CRED.read_text())["api_key"]
+        except Exception:
+            pass
+    return ""
+
+def check_groq_balance(key):
+    """检查 Groq 是否可用 (快速探测)"""
+    try:
+        proxy = os.environ.get("HTTPS_PROXY") or os.environ.get("https_proxy")
+        curl_args = ["curl", "-s", "--max-time", "10"]
+        if proxy:
+            curl_args += ["--proxy", proxy]
+        else:
+            # 无代理则直连; 大陆直连 Groq 必 403, check 返回 False 即如实反映 (不 fallback 硬编码端口)
+            print("  [groq] check: 未检测到 HTTPS_PROXY/https_proxy, 走直连探测", flush=True)
+        curl_args += ["-H", f"Authorization: Bearer {key}",
+                      "https://api.groq.com/openai/v1/models"]
+        r = run_with_retry(
+            curl_args,
+            capture_output=True, text=True, timeout=15
+        )
+        if r.returncode == 0:
+            d = json.loads(r.stdout)
+            if "data" in d:
+                return True
+            err = d.get("error", {})
+            msg = err.get("message", "")
+            # 429=限速(还有余额), 401=key无效
+            if "429" in str(err.get("code", "")) or "rate" in msg.lower():
+                return True
+            print(f"  [groq] check: {msg[:200]}", flush=True)
+        return False
+    except Exception as e:
+        print(f"  [groq] check error: {e}", flush=True)
+        return False
+
+
+# ═══════════════════════════════════════════════════════
+# 音频提取 (抖音: 直接从URL流式抽取, 不下mp4)
+# ═══════════════════════════════════════════════════════
+
+# 抖音/B站 hotlink 域名 -- ffmpeg 内置 HTTP 客户端对这些 CDN 会 hang 或 403
+# 改走 urllib 先下载到本地 .src, 再 ffmpeg 本地转码 (B站 audio_to_wav 验证过稳)
+_HOTLINK_DOMAINS = (
+    "v26-web.douyinvod.com", "v3-web.douyinvod.com", "v6-web.douyinvod.com",
+    "v9-web.douyinvod.com", "v11-web.douyinvod.com",  # 抖音 CDN
+    "upos-sz-mirror",  # B站 upos CDN
+)
+
+def _needs_urllib_prefetch(url):
+    """URL 是否需要先 urllib 预下载到本地再 ffmpeg 转码."""
+    return any(d in url for d in _HOTLINK_DOMAINS)
+
+
+def _download_url_to_local(url, out_path, headers=None, timeout=180, chunk_mb=1):
+    """下载 URL 到本地文件 (urllib, 不用 ffmpeg 内置 HTTP). 返回 True/False."""
+    try:
+        # 2026-07-26: 国内 CDN(B站 upos/mcdn)剥代理直连提速; douyin CDN 保留代理
+        # (直连 douyin 易被 TCP reset)。仅对 bilibili/upos/mcdn 域名生效。
+        _BYPASS = ("upos", "mcdn", "bilibili", "bilivideo")
+        _bypass = any(h in url for h in _BYPASS)
+        if _bypass:
+            _opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        else:
+            _opener = urllib.request.build_opener()
+        req = urllib.request.Request(url, headers=headers or {})
+        with _opener.open(req, timeout=timeout) as resp, open(out_path, "wb") as f:
+            while True:
+                chunk = resp.read(chunk_mb << 20)
+                if not chunk:
+                    break
+                f.write(chunk)
+        return os.path.exists(out_path) and os.path.getsize(out_path) > 0
+    except Exception as e:
+        print(f"  [audio] urllib download err: {str(e)[:200]}", flush=True)
+        try:
+            os.remove(out_path)
+        except Exception:
+            pass
+        return False
+
+
+def _dump_audio_timing(out_wav, dl_s, tr_s, t0, ok=True):
+    """打印 extract_audio_to_wav 实测耗时（下载/转码/总），供 supervisor 结构化解析精准计时。"""
+    try:
+        mb = os.path.getsize(out_wav) / 1024 / 1024 if (ok and os.path.exists(out_wav)) else 0.0
+    except Exception:
+        mb = 0.0
+    tot = time.time() - t0
+    if ok:
+        print(f"  [audio] 抽取完成 size={mb:.1f}MB 下载={dl_s:.1f}s 转码={tr_s:.1f}s 总={tot:.1f}s", flush=True)
+    else:
+        print(f"  [audio] 抽取失败 下载={dl_s:.1f}s 转码={tr_s:.1f}s 总={tot:.1f}s", flush=True)
+
+
+def extract_audio_to_wav(source, out_wav, headers=None, timeout=300):
+    """
+    从音频源提取16kHz单声道WAV。
+    source: 本地文件路径 或 URL
+    headers: dict of HTTP headers (用于URL鉴权)
+
+    2026-07-16 改: hotlink 域名 (抖音/B站 upos) 走 urllib 预下载 + ffmpeg 本地转码
+    双步骤, 避免 ffmpeg 内置 HTTP 客户端在多 fd 压力下 hang.
+
+    2026-07-26 改: 实测下载/转码/总耗时并打印结构化行(供 supervisor 精准计时),
+    解决原 supervisor 靠行位置 gap 推断导致 extract_audio 计时漏掉下载+转码的问题。
+    """
+    import os
+    import time as _at
+    is_url = bool(source and re.match(r'^https?://', str(source)))
+
+    t0 = _at.time()
+    dl_s = 0.0
+    tr_s = 0.0
+
+    # 路径1: URL + hotlink 域名 → urllib 预下载 → ffmpeg 本地转码
+    if is_url and _needs_urllib_prefetch(source):
+        print(f"  [audio] hotlink 域名, urllib 预下载...", flush=True)
+        dl = out_wav + ".src"
+        tdl0 = _at.time()
+        dl_ok = _download_url_to_local(source, dl, headers=headers, timeout=180)
+        dl_s = _at.time() - tdl0
+        if dl_ok:
+            ttr0 = _at.time()
+            cmd = [
+                "ffmpeg", "-y", "-i", dl,
+                "-vn", "-ar", "16000", "-ac", "1",
+                "-loglevel", "error", out_wav,
+            ]
+            try:
+                proc = popen_with_retry(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                        start_new_session=True)
+                try:
+                    stdout, stderr = proc.communicate(timeout=180)
+                    class _R: pass
+                    r = _R(); r.returncode = proc.returncode
+                except subprocess.TimeoutExpired:
+                    try: os.killpg(os.getpgid(proc.pid), 9)
+                    except (ProcessLookupError, PermissionError): pass
+                    try: proc.communicate(timeout=2)
+                    except Exception: pass
+                    print(f"  [audio] ffmpeg 转码超时", flush=True)
+                    try: os.remove(dl)
+                    except Exception: pass
+                    tr_s = _at.time() - ttr0
+                    _dump_audio_timing(out_wav, dl_s, tr_s, t0, ok=False)
+                    return False
+            except Exception as e:
+                tr_s = _at.time() - ttr0
+                print(f"  [audio] ffmpeg 异常: {e}", flush=True)
+                try: os.remove(dl)
+                except Exception: pass
+                _dump_audio_timing(out_wav, dl_s, tr_s, t0, ok=False)
+                return False
+            try:
+                os.remove(dl)
+            except Exception:
+                pass
+            tr_s = _at.time() - ttr0
+            if r.returncode != 0:
+                stderr = (stderr or b"").decode(errors="replace")[:300]
+                print(f"  [audio] ffmpeg failed: {stderr}", flush=True)
+                _dump_audio_timing(out_wav, dl_s, tr_s, t0, ok=False)
+                return False
+            if os.path.exists(out_wav) and os.path.getsize(out_wav) > 1000:
+                _dump_audio_timing(out_wav, dl_s, tr_s, t0, ok=True)
+                return True
+            _dump_audio_timing(out_wav, dl_s, tr_s, t0, ok=False)
+            return False
+        else:
+            print(f"  [audio] urllib 下载失败, 兜底试 ffmpeg 流式", flush=True)
+            # 落到路径2 用 ffmpeg 直接读原始 URL
+
+    # 路径2: 默认 (本地文件或非 hotlink URL) → ffmpeg 流式 (保留原行为)
+    hdr_args = []
+    if headers:
+        for k, v in headers.items():
+            hdr_args += ["-headers", f"{k}: {v}"]
+
+    cmd = [
+        "ffmpeg", "-y",
+        *hdr_args,
+        "-i", source,
+        "-vn",                # 不要视频流
+        "-ar", "16000",
+        "-ac", "1",
+        "-loglevel", "error",
+        out_wav
+    ]
+    try:
+        ttr0 = _at.time()
+        proc = popen_with_retry(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                start_new_session=True)
+        try:
+            stdout, stderr = proc.communicate(timeout=timeout)
+            class _R: pass
+            r = _R(); r.returncode = proc.returncode
+        except subprocess.TimeoutExpired:
+            try:
+                os.killpg(os.getpgid(proc.pid), 9)
+            except (ProcessLookupError, PermissionError):
+                pass
+            try: proc.communicate(timeout=2)
+            except Exception: pass
+            print(f"  [audio] ffmpeg 超时 ({timeout}s, killpg 已发)", flush=True)
+            tr_s = _at.time() - ttr0
+            _dump_audio_timing(out_wav, dl_s, tr_s, t0, ok=False)
+            return False
+    except Exception as e:
+        tr_s = _at.time() - ttr0
+        print(f"  [audio] ffmpeg 异常: {e}", flush=True)
+        _dump_audio_timing(out_wav, dl_s, tr_s, t0, ok=False)
+        return False
+    tr_s = _at.time() - ttr0
+    if r.returncode != 0:
+        stderr = (stderr or b"").decode(errors="replace")[:300]
+        print(f"  [audio] ffmpeg failed: {stderr}", flush=True)
+        _dump_audio_timing(out_wav, dl_s, tr_s, t0, ok=False)
+        return False
+    if os.path.exists(out_wav) and os.path.getsize(out_wav) > 1000:
+        _dump_audio_timing(out_wav, dl_s, tr_s, t0, ok=True)
+        return True
+    _dump_audio_timing(out_wav, dl_s, tr_s, t0, ok=False)
+    return False
+
+
+def get_audio_duration(wav_path):
+    """获取音频时长(秒). 2026-07-16 v2.2: Popen+killpg 防 hang."""
+    import os
+    try:
+        proc = subprocess.Popen(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+             "-of", "csv=p=0", wav_path],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            text=True, start_new_session=True,
+        )
+        stdout, stderr = proc.communicate(timeout=30)
+    except subprocess.TimeoutExpired:
+        try: os.killpg(os.getpgid(proc.pid), 9)
+        except (ProcessLookupError, PermissionError): pass
+        try: proc.communicate(timeout=2)
+        except Exception: pass
+        return 0
+    except Exception:
+        return 0
+    try:
+        return float((stdout or "").strip())
+    except Exception:
+        return 0
+
+
+# ═══════════════════════════════════════════════════════
+# Groq Whisper API
+# ═══════════════════════════════════════════════════════
+
+# Groq 额度（免费档，同步自 模型列表.md / console.groq.com/docs/rate-limits）
+# 用途：429 退避 + 额度耗尽即停用（不再傻发）。ASH=7200 音频秒/小时是批量爬真瓶颈。
+GROQ_LIMITS = {
+    "model": "whisper-large-v3",
+    "plan": "free",
+    "max_mb": 25,
+    "rpm": 20,
+    "rpd": 2000,
+    "ash_per_hour": 7200,
+    "asd_per_day": 28800,
+}
+
+
+def _groq_backoff(attempt):
+    """429/限流退避序列（秒）：逐步拉长，避免对限流端点持续轰炸。"""
+    seq = [30, 60, 120, 300]
+    return seq[min(max(attempt, 0), len(seq) - 1)]
+
+
+def _groq_http_code(hdr_file):
+    """从 curl -D 写入的 header 文件解析 HTTP 状态码；解析失败返回 0。
+
+    取最后一个 HTTP 状态行（兼容 100 Continue 前置），状态码为该行第 2 个 token。
+    """
+    code = 0
+    try:
+        for line in open(hdr_file, encoding="utf-8", errors="ignore"):
+            line = line.strip()
+            if line.upper().startswith("HTTP/"):
+                parts = line.split()
+                if len(parts) >= 2 and parts[1].isdigit():
+                    code = int(parts[1])
+    except Exception:
+        pass
+    return code
+
+
+def _groq_is_rate_limit(body):
+    """body 是否表达限流（必须 parse JSON 确认 error 结构里的限流标识）。
+
+    POC-fix #3 (2026-07-30): 原代码用字符串 contains '429' 误判, 因 Whisper verbose_json
+    segments 里的 compression_ratio/no_speech_prob/tokens 等字段可能含字面 '429'
+    (e.g. compression_ratio=1.4294671). 现改为只检测 error 字段.
+    """
+    try:
+        data = json.loads(body or "{}")
+    except Exception:
+        return False
+    err = data.get("error")
+    if not isinstance(err, dict):
+        return False
+    # 检查 error.code 是 429 或 message 含 rate limit 关键字
+    code = err.get("code") or err.get("status") or ""
+    msg = str(err.get("message", "")).lower()
+    if str(code) == "429":
+        return True
+    if "rate limit" in msg or "rate_limit" in msg or "too many requests" in msg:
+        return True
+    return False
+
+
+def _groq_rate_limit_detail(hdr_file, body):
+    """提取不含凭证的 429 诊断信息，避免旧日志只留一个 429 无法判断命中哪项限制。"""
+    wanted = ("retry-after", "x-ratelimit-limit", "x-ratelimit-remaining",
+              "x-ratelimit-reset", "x-request-id")
+    details = []
+    try:
+        for raw in open(hdr_file, encoding="utf-8", errors="ignore"):
+            line = raw.strip()
+            low = line.lower()
+            if any(low.startswith(k + ":") for k in wanted):
+                details.append(line)
+    except Exception:
+        pass
+    msg = ""
+    try:
+        data = json.loads(body or "{}")
+        err = data.get("error", data)
+        msg = str(err.get("message", err)) if isinstance(err, dict) else str(err)
+    except Exception:
+        msg = (body or "").strip()
+    if msg:
+        details.insert(0, "message=" + msg[:240].replace("\n", " "))
+    return "; ".join(details)[:600] or "Groq 未返回可解析的限流详情"
+
+
+def transcribe_groq(wav_path, groq_key, model="whisper-large-v3"):
+    """调用 Groq Whisper API 转录（单文件单次上传，快速失败回退 bailian）。
+
+    速度优先（2026-07-26 修正，回退 §20 的 3×300s 重试）：
+    - 只发一次请求，任何失败（限流/网关/超时/非 JSON）立即 return None 走 fallback，绝不傻等。
+    - 401：永久禁用（_GROQ_DISABLED）。
+    - 429/限流：标记 _GROQ_COOLDOWN_UNTIL（本批后续跳过，不重试本帖）。
+    - 非 JSON（网关/网络层）：直接失败，不重试（恢复之前"快"的行为）。
+    """
+    global _GROQ_DISABLED, _GROQ_COOLDOWN_UNTIL, _GROQ_CONSECUTIVE_429
+    import time as _t
+    if _GROQ_DISABLED:
+        return None
+    # 防御：>25MB 直接丢 bailian（groq 官方硬上限，不切片）
+    try:
+        if os.path.getsize(wav_path) > 25 * 1024 * 1024:
+            print("  [groq] 文件 >25MB，跳过（丢 bailian）", flush=True)
+            return None
+    except OSError:
+        pass
+    hdr_file = wav_path + ".groqhdr"
+    # 2026-07-28: 改用 Popen + killpg 避免 curl hang 时 subprocess.run 卡死
+    # （之前用 subprocess.run + communicate(timeout=150)，selector.select 在 pipe fd 上 hang）
+    import os as _os_groq
+    # 修 #9 (2026-07-30): max-time 120s 略激进, 大文件 (>20MB) 转码 + 上传可能 >60s
+    #           改 180s, 减少误报 timeout (虽然我们只看 HTTP 状态, 但 curl 等满 timeout 会杀子进程)
+    # 2026-08-07: 改英文 prompt 避免 Whisper 幻觉成中文 (旧中文 prompt 偶尔会被 whisper
+    #   当成音频内容转录出来, 177 个文件受影响, 典型残留:
+    #   "请加上标点符号, 句末用句号, 列举用逗号, 问句用句号, 列举用逗号。"
+    # 验证: 英文 prompt="Chinese, formal, with proper punctuation."
+    #   → 标点保留 + 无中文 prompt 残留
+    _punct_prompt = "Chinese, formal, with proper punctuation."
+    # A2 (2026-07-31): 加 --connect-timeout 15 让网络握手快速失败, 减少 Clash TUN 大流量超时等待
+    # 之前: max-time 180 内只要网络抽风就要等满 180s 才放弃 → 3 分钟/条 × 23 条 = 70 min 浪费
+    # 现在: 连接 15s 超时 → 立刻进入 retry (3 次 × 指数退避 1s/2s/4s) → 最多 180s 内完成
+    _curl_post_args = ["-X", "POST", "https://api.groq.com/openai/v1/audio/transcriptions",
+                      "-H", f"Authorization: Bearer {groq_key}",
+                      "-F", f"file=@{wav_path}",
+                      "-F", f"model={model}",
+                      "-F", "response_format=verbose_json",
+                      "-F", "language=zh",
+                      "-F", f"prompt={_punct_prompt}"]
+    # 0731 修: 空 body 1 次快速重试需要, 记录本次调用起始时间
+    call_start = _t.time()
+
+    # A2 (2026-07-31): 网络层 retry 循环 + 动态超时
+    # 旧逻辑: 单次 curl --max-time 180, 失败 return None, 上层误判成 "Groq 服务空"
+    # 新逻辑: 识别网络层错误 (returncode 28/35/56 + body="" + hdr size=0), 自动 retry
+    # 429/401/error 等 Groq 自身错误 → 不重试 (避免加重 Groq 限流)
+    # 超时策略: 第 1 次 180s 给大视频机会, retry 1-3 用 30s 快速失败
+    #   总计: 180+1+30+2+30+4+30 = 277s ≈ 4.5 min (vs 原 4×180 = 12 min)
+    _NET_ERR_CODES = (28, 35, 56, 7, 52, 6, 18)  # timeout/SSL/recv/conn refused/empty/host unresolved/partial
+    _MAX_NET_RETRIES = 3
+    # A4 (2026-08-01): mp3 32k 压缩后 wav 大小仍 ~1.5-3MB, 当前网络上传 ~20KB/s
+    #   → 3MB mp3 需 150s 传完 + 30s 处理 = 180s 临界, 网络波动就 timeout
+    #   → 把 max-time 从 180s 拉到 300s (5min), retry 从 30s 拉到 90/60/60s
+    # 之前 (A2): (180, 30, 30, 30) → 4×180s 耗 12min/条空跑
+    # 现在 (A4): (300, 90, 60, 60) → 正常 <90s, worst 510s/条
+    _RETRY_TIMEOUTS = (300, 90, 60, 60)  # 第 1 次给 mp3 完整上传机会, retry 给恢复时间
+    cr = None
+    for _retry in range(_MAX_NET_RETRIES + 1):  # 0..3 = 1 次原 + 3 次 retry
+        _max_time = _RETRY_TIMEOUTS[_retry]
+        _comm_timeout = _max_time + 20  # 给 20s buffer 避免 subprocess.TimeoutExpired
+        cmd = ["curl", "-s", "--max-time", str(_max_time), "--connect-timeout", "15",
+               "-D", hdr_file] + _curl_post_args
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                text=True, start_new_session=True)
+        try:
+            stdout, stderr = proc.communicate(timeout=_comm_timeout)
+            class _R_groq: pass
+            cr = _R_groq()
+            cr.stdout = stdout
+            cr.stderr = stderr
+            cr.returncode = proc.returncode
+        except subprocess.TimeoutExpired:
+            # 杀进程组（curl 可能 fork 出 grandchild）
+            try:
+                _os_groq.killpg(_os_groq.getpgid(proc.pid), 9)
+            except (ProcessLookupError, PermissionError):
+                pass
+            try:
+                proc.communicate(timeout=2)
+            except Exception:
+                pass
+            print(f"  [groq] curl 整体超时 ({_t.time()-call_start:.1f}s), killpg 已发", flush=True)
+            return None  # 整体 200s 超时是硬上限, 不 retry (避拖慢整批)
+
+        # 检测网络层错误: returncode in 28/35/56/etc + body 空 + hdr size=0
+        _stderr = (cr.stderr or "")
+        _is_net_err = (cr.returncode in _NET_ERR_CODES or
+                       (cr.returncode != 0 and "Couldn't resolve host" in _stderr) or
+                       "Operation timeout" in _stderr or
+                       "Connection timed out" in _stderr or
+                       "SSL connect error" in _stderr or
+                       "Recv failure" in _stderr)
+        # A4 (2026-08-01): HTTP 5xx (500/502/503/504) 也 retry
+        # 之前: Groq 偶尔返回 500 (内部错误), 没 retry 直接 fail, 触发 _consecutive_fails 退出
+        # 现在: 5xx 是临时服务端错误, 短暂 retry 大概率成功
+        _is_5xx = False
+        if cr.returncode == 0 and not _is_net_err:
+            try:
+                _hcode = _groq_http_code(hdr_file)
+                if 500 <= _hcode < 600:
+                    _is_5xx = True
+            except Exception:
+                pass
+        if not _is_net_err and not _is_5xx:
+            break  # 成功或 Groq 错误 (4xx), 不 retry
+        # 网络层错误 → retry
+        # A2d (2026-07-31): 间隔从 1s/2s/4s 改成 5s/15s/30s
+        # 之前: 网络真实恢复需要 10s+, 1s/2s/4s 太短空跑
+        # 现在: 5s 给短抖动恢复, 15s 给中抖动, 30s 给长抖动
+        if _retry < _MAX_NET_RETRIES:
+            _sleep = [5, 15, 30][_retry]  # 5s/15s/30s 自适应退避
+            if _is_5xx:
+                print(f"  [groq] 服务端 5xx (HTTP {_hcode}), "
+                      f"{_sleep}s 后 retry ({_retry+1}/{_MAX_NET_RETRIES}, "
+                      f"next max-time={_RETRY_TIMEOUTS[_retry+1]}s)...", flush=True)
+            else:
+                print(f"  [groq] 网络层失败 (returncode={cr.returncode}, "
+                      f"stderr='{_stderr.strip()[:80]}'), "
+                      f"{_sleep}s 后 retry ({_retry+1}/{_MAX_NET_RETRIES}, next max-time={_RETRY_TIMEOUTS[_retry+1]}s)...", flush=True)
+            _t.sleep(_sleep)
+            continue
+        # 3 次都失败
+        if _is_5xx:
+            print(f"  [groq] 服务端 5xx (HTTP {_hcode}), 3 次 retry 用尽, 失败", flush=True)
+        else:
+            print(f"  [groq] 网络层失败 {cr.returncode}, {cr.stderr.strip()[:200]}, 3 次 retry 用尽, 失败", flush=True)
+        return None
+
+    code = _groq_http_code(hdr_file)
+    body = (cr.stdout or "").strip()
+    # A2 诊断: 当 code=0 + body 空 + hdr 文件 size=0, 上面 retry 已处理; 走到这说明 retry 也未恢复
+    if code == 0 and not body:
+        try:
+            _hdr_size = os.path.getsize(hdr_file)
+        except OSError:
+            _hdr_size = 0
+        print(f"  [groq] curl returncode={cr.returncode} 但没拿到 HTTP 头 (hdr={_hdr_size}B), "
+              f"stderr='{(cr.stderr or '').strip()[:120]}'", flush=True)
+    # 401 失效 → 永久禁用
+    if code == 401 or "invalid_api_key" in body.lower():
+        _GROQ_DISABLED = True
+        _groq_state_update({"disabled": True, "disabled_reason": "401 invalid_api_key"})
+        print("  [groq] key 失效, 永久禁用", flush=True)
+        return None
+    # 429 / 限流 → 标记冷却，本帖直接放弃（不重试）
+    # POC-fix #1 (2026-07-30): 但 Groq 软限流会把完整 verbose_json (含 text) 塞进 error.message，
+    #                         这种情况必须把 transcript 拿出来, 不能丢
+    if code == 429 or _groq_is_rate_limit(body):
+        partial_text = None
+        try:
+            _cdata_429 = json.loads(body or "{}")
+            _err_429 = _cdata_429.get("error", {})
+            _msg_429 = _err_429.get("message", "{}") if isinstance(_err_429, dict) else str(_err_429)
+            # message 字段可能是 JSON string (verbose_json 内嵌), parse 它
+            try:
+                _msg_json = json.loads(_msg_429) if isinstance(_msg_429, str) else _msg_429
+                if isinstance(_msg_json, dict) and _msg_json.get("text"):
+                    partial_text = _msg_json["text"].strip()
+            except Exception:
+                # message 可能是纯文本, 直接看 cdata 顶层 text
+                if _cdata_429.get("text"):
+                    partial_text = _cdata_429["text"].strip()
+        except Exception:
+            pass
+
+        # 修 #11 (2026-07-30): 真两阶段 cooldown
+        #   1×429 → cooldown_after_429_sec (默认 120s), 期间本帖放弃走 bailian
+        #   2×429 (cooldown 内再来) → cooldown_after_2x429_sec (默认 300s), 标记 _GROQ_CONSECUTIVE_429>=2
+        #   本批次 caller 看到 _GROQ_CONSECUTIVE_429>=2 直接走 bailian, 不再回 Groq
+        _GROQ_CONSECUTIVE_429 += 1
+        _cfg429 = load_config().get("transcription", {}).get("groq", {})
+        if _GROQ_CONSECUTIVE_429 >= 2:
+            _cooldown_sec = int(_cfg429.get("cooldown_after_2x429_sec", 300))
+            print(f"  [groq] 连续第 {_GROQ_CONSECUTIVE_429} 次 429, 长 cooldown {_cooldown_sec}s + 本批不再回 Groq", flush=True)
+        else:
+            _cooldown_sec = int(_cfg429.get("cooldown_after_429_sec", 120))
+        _GROQ_COOLDOWN_UNTIL = _t.time() + _cooldown_sec
+        # 持久化到 state 文件，让 fork 的子进程也能看到
+        _groq_state_update({
+            "cooldown_until": _GROQ_COOLDOWN_UNTIL,
+            "consecutive_429": _GROQ_CONSECUTIVE_429,
+        })
+        detail = _groq_rate_limit_detail(hdr_file, body)
+        if partial_text:
+            _GROQ_LAST_WAS_429 = True
+            print(f"  [groq] 软限流 (HTTP 429), 但拿到 transcript {len(partial_text)} chars, cooldown {_cooldown_sec}s; {detail[:200]}", flush=True)
+            return partial_text  # POC-fix #1: 429 with transcript 也算成功, src tag 由 caller 设
+        print(f"  [groq] 额度限流 (HTTP 429), cooldown {_cooldown_sec}s; {detail}", flush=True)
+        return None
+    # 非 JSON（网关/网络层错误）→ 直接失败，不重试（恢复之前"快"的行为）
+    try:
+        cdata = json.loads(body) if body else {}
+    except Exception:
+        # 修 #8 (2026-07-30): 把 HTTP code 带出来, 方便 supervisor 识别
+        print(f"  [groq] 非 JSON 响应 (HTTP {code}, {len(body)} bytes), 走 bailian", flush=True)
+        return None
+    if "error" in cdata:
+        err = cdata["error"]
+        msg = str(err.get("message", err))
+        # 修 #8: 区分 4xx vs 5xx, 5xx 不算 rate limit
+        if code and 500 <= code < 600:
+            print(f"  [groq] 服务端错误 (HTTP {code}): {msg[:160]}", flush=True)
+        else:
+            print(f"  [groq] error (HTTP {code}): {msg[:200]}", flush=True)
+        return None
+    segs = cdata.get("segments", [])
+    # 0731 修: Groq 偶发 HTTP 200 + 空 body (返空不报错) → 30s 内抽风快速重试 1 次
+    # 之前 260715 那次: 空 body 等满 3 分钟才死, 加这个 retry 后秒级恢复
+    # 关键: 30s 内才算抽风 (因为正常 Groq 第一次响应也 5-10s 就开始 streaming), 慢请求不重试
+    if code == 200 and not segs and not cdata.get("error"):
+        _elapsed = _t.time() - call_start
+        if 0 < _elapsed < 30:
+            print(f"  [groq] 空 segments (HTTP 200, {_elapsed:.1f}s), 1 次快速重试...", flush=True)
+            try:
+                _proc2 = popen_with_retry(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                          text=True, start_new_session=True)
+                _stdout2, _stderr2 = _proc2.communicate(timeout=200)
+                class _R_groq2: pass
+                _cr2 = _R_groq2()
+                _cr2.stdout = _stdout2
+                _cr2.stderr = _stderr2
+                _cr2.returncode = _proc2.returncode
+                _code2 = _groq_http_code(hdr_file)
+                _body2 = (_cr2.stdout or "").strip()
+            except subprocess.TimeoutExpired:
+                try:
+                    _os_groq.killpg(_os_groq.getpgid(_proc2.pid), 9)
+                except (ProcessLookupError, PermissionError):
+                    pass
+                try:
+                    _proc2.communicate(timeout=2)
+                except Exception:
+                    pass
+                print(f"  [groq] 重试仍超时 ({_elapsed:.1f}s), 失败", flush=True)
+                return None
+            try:
+                _cdata2 = json.loads(_body2) if _body2 else {}
+            except Exception:
+                print(f"  [groq] 重试仍非 JSON (HTTP {_code2}, {len(_body2)} bytes), 失败", flush=True)
+                return None
+            if "error" in _cdata2:
+                print(f"  [groq] 重试 error (HTTP {_code2}): {str(_cdata2['error'])[:200]}", flush=True)
+                return None
+            segs = _cdata2.get("segments", [])
+            if segs:
+                print(f"  [groq] 重试成功, {len(segs)} segments", flush=True)
+            else:
+                print(f"  [groq] 重试仍空 segments ({_t.time() - call_start:.1f}s 总), 失败", flush=True)
+                return None
+        else:
+            # 2026-07-31 修: 30s-90s 之间也重试 1 次. 网络层抽风 (Clash TUN reset) 通常 30-60s 返空,
+            #              但服务端真慢的视频 (>60s) 才超 90s, 区分开了.
+            #              retry 用同一 cmd (curl 自动重连代理) → 大量 5h48min 跑批抽风可降.
+            if _elapsed < 90:
+                print(f"  [groq] 空 segments (HTTP 200, {_elapsed:.1f}s 慢请求), 1 次快速重试...", flush=True)
+                try:
+                    _proc2 = popen_with_retry(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                              text=True, start_new_session=True)
+                    _stdout2, _stderr2 = _proc2.communicate(timeout=120)
+                    class _R_groq2b: pass
+                    _cr2 = _R_groq2b()
+                    _cr2.stdout = _stdout2
+                    _cr2.stderr = _stderr2
+                    _cr2.returncode = _proc2.returncode
+                    _code2 = _groq_http_code(hdr_file)
+                    _body2 = (_cr2.stdout or "").strip()
+                except subprocess.TimeoutExpired:
+                    try:
+                        _os_groq.killpg(_os_groq.getpgid(_proc2.pid), 9)
+                    except (ProcessLookupError, PermissionError):
+                        pass
+                    try:
+                        _proc2.communicate(timeout=2)
+                    except Exception:
+                        pass
+                    print(f"  [groq] 重试仍超时 ({_elapsed:.1f}s), 失败", flush=True)
+                    return None
+                try:
+                    _cdata2 = json.loads(_body2) if _body2 else {}
+                except Exception:
+                    print(f"  [groq] 重试仍非 JSON (HTTP {_code2}, {len(_body2)} bytes), 失败", flush=True)
+                    return None
+                if "error" in _cdata2:
+                    print(f"  [groq] 重试 error (HTTP {_code2}): {str(_cdata2['error'])[:200]}", flush=True)
+                    return None
+                segs = _cdata2.get("segments", [])
+                if segs:
+                    print(f"  [groq] 慢请求重试成功, {len(segs)} segments", flush=True)
+                else:
+                    print(f"  [groq] 慢请求重试仍空 segments ({_t.time() - call_start:.1f}s 总), 失败", flush=True)
+                    return None
+            else:
+                # 90s+ 返空 = 视频是真大/服务端真慢, 不重试 (避免拖慢整批)
+                print(f"  [groq] 空 segments (HTTP 200, {_elapsed:.1f}s 极慢), 不重试, 失败", flush=True)
+                return None
+    _GROQ_CONSECUTIVE_429 = 0  # 修 #11: 成功路径重置连续 429 计数
+    # 成功时也同步到 state 文件，让子进程看到正确的计数
+    _groq_state_update({"consecutive_429": 0})
+    return " ".join((s.get("text") or "").strip() for s in segs if (s.get("text") or "").strip())
+
+
+# A2d (2026-07-31): 预探测, 让 caller (backfill) 跑大文件前先确认 Groq 响应时间
+# 真实场景: 小 WAV 探测 1.6s 表示网络通畅; 探测 >10s 表示正在抽风, 应该等
+def groq_probe(timeout=10):
+    """发 1s 静音小 WAV 给 Groq, 返回响应耗时 (秒).
+    返回值:
+      < 0  : API 错误 (绝对值是 Groq HTTP code, e.g. -429)
+      0    : 网络层失败 (curl returncode != 0)
+      > 0  : 成功响应耗时 (秒)
+    """
+    import tempfile
+    import wave, struct
+    global _GROQ_DISABLED
+    if _GROQ_DISABLED:
+        return -401
+    groq_key = get_groq_key()
+    if not groq_key:
+        return 0
+    # 1s 静音 WAV
+    tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
+    tmp_path = tmp.name
+    tmp.close()
+    try:
+        with wave.open(tmp_path, "wb") as w:
+            w.setnchannels(1); w.setsampwidth(2); w.setframerate(16000)
+            w.writeframes(b"\x00\x00" * 16000)
+        hdr_file = tmp_path + ".hdr"
+        cmd = ["curl", "-s", "--max-time", str(timeout), "--connect-timeout", "10",
+               "-D", hdr_file, "-w", "\n%{time_total}",
+               "-X", "POST", "https://api.groq.com/openai/v1/audio/transcriptions",
+               "-H", f"Authorization: Bearer {groq_key}",
+               "-F", f"file=@{tmp_path}",
+               "-F", "model=whisper-large-v3",
+               "-F", "response_format=verbose_json",
+               "-F", "language=zh",
+               "-F", "prompt=以下是普通话"]
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout+5)
+        if proc.returncode != 0:
+            return 0
+        code = _groq_http_code(hdr_file)
+        if code == 0:
+            return 0
+        if code == 429 or code >= 500:
+            return -code
+        # parse time_total from -w output (last line)
+        try:
+            t = float(proc.stdout.strip().split("\n")[-1])
+        except Exception:
+            t = float(timeout)
+        return round(t, 2)
+    except subprocess.TimeoutExpired:
+        return 0
+    except Exception:
+        return 0
+    finally:
+        try: os.remove(tmp_path)
+        except OSError: pass
+        try: os.remove(hdr_file)
+        except OSError: pass
+
+
+# ═══════════════════════════════════════════════════════
+# 本地 faster-whisper
+# ═══════════════════════════════════════════════════════
+
+def transcribe_local(wav_path, model_name="base", device="cpu", compute_type="int8"):
+    """本地 faster-whisper 转录"""
+    try:
+        from faster_whisper import WhisperModel
+        model = WhisperModel(model_name, device=device, compute_type=compute_type)
+        t0 = time.time()
+        segments, _ = model.transcribe(wav_path, language="zh", beam_size=5)
+        text = " ".join(seg.text.strip() for seg in segments)
+        dur = time.time() - t0
+        print(f"  [local] {model_name} model, {dur:.1f}s, {len(text)} chars", flush=True)
+        return text
+    except Exception as e:
+        print(f"  [local] error: {e}", flush=True)
+        return ""
+
+
+# ─── mlx-whisper (Apple 神经引擎, 远快于 cpu int8) ───
+_MLX_REPO = {
+    "tiny": "mlx-community/whisper-tiny-mlx",
+    "base": "mlx-community/whisper-base-mlx",
+    "small": "mlx-community/whisper-small-mlx",
+    "medium": "mlx-community/whisper-medium-mlx",
+    "large": "mlx-community/whisper-large-v3-mlx",
+}
+# groq 因限流/额度耗尽被禁用的截止时刻（Unix 秒）；Step0 在此刻前跳 groq，由 transcribe_groq 在 429 时设置
+# 2026-08-25: 改用 Groq state 文件持久化，fork 后父子进程共享同一状态
+_GR_STATE = _groq_state_load()  # 从 state 文件加载
+_GROQ_COOLDOWN_UNTIL = _GR_STATE.get("cooldown_until", 0.0)
+_GROQ_DISABLED = _GR_STATE.get("disabled", False)
+_GROQ_LAST_WAS_429 = False  # 仅内存状态，不持久化
+_GROQ_CONSECUTIVE_429 = _GR_STATE.get("consecutive_429", 0)
+
+# ═══════════════════════════════════════════════════════
+# B (2026-08-06): 大音频自动切片, 避免单条吃爆 Groq ASPH 配额 (7200s/h)
+# 实测 8/6 那条 35 分钟 (1409s) wav 单条吃 708s = 25% 配额 → 撞线后 20 wav 连锁失败
+# ═══════════════════════════════════════════════════════
+SLICE_THRESHOLD_SEC = 600   # 时长超过 10 分钟才切片
+SLICE_LEN_SEC = 240         # 每段 4 分钟 (POC 8/5 验证 100% 成功率)
+
+# ═══════════════════════════════════════════════════════
+# A (2026-08-06): ASPH 软限追踪, 累计接近 7200s 暂停等窗口重置
+# 解决: 即便单条切片后, 整批累计 audio 仍可能撞 7200s 上限
+# ═══════════════════════════════════════════════════════
+_ASPH_WINDOW_START = _GR_STATE.get("asph_window_start", 0.0)
+_ASPH_USED = _GR_STATE.get("asph_used", 0.0)
+_ASPH_SOFT_LIMIT = 6500     # 留 700s buffer (避免边缘 429)
+
+
+def _ffprobe_duration(path: str) -> float:
+    """取音频时长（秒）。失败返回 0.0."""
+    try:
+        r = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+             "-of", "default=noprint_wrappers=1:nokey=1", path],
+            capture_output=True, text=True, timeout=30,
+        )
+        return float(r.stdout.strip())
+    except Exception:
+        return 0.0
+
+
+def _slice_audio(audio_path: str, slice_len_sec: int = SLICE_LEN_SEC) -> list:
+    """切音频为多段 (返回切片路径列表). 切片与原文件同目录, 由 caller 清理 tmp_ctx."""
+    duration = _ffprobe_duration(audio_path)
+    if duration <= slice_len_sec:
+        return [audio_path]
+
+    n = int(duration // slice_len_sec) + (1 if duration % slice_len_sec > 0 else 0)
+    base, ext = os.path.splitext(audio_path)
+    slices = []
+    for i in range(n):
+        start = i * slice_len_sec
+        out = f"{base}_p{i+1:02d}{ext}"
+        r = subprocess.run(
+            ["ffmpeg", "-y", "-loglevel", "error",
+             "-i", audio_path,
+             "-ss", str(start),
+             "-t", str(slice_len_sec),
+             "-c", "copy",
+             out],
+            capture_output=True, timeout=60,
+        )
+        if r.returncode == 0 and os.path.exists(out) and os.path.getsize(out) > 0:
+            slices.append(out)
+        else:
+            print(f"    ⚠️ 切片失败 p{i+1:02d}{ext} (rc={r.returncode})", flush=True)
+    return slices if slices else [audio_path]
+
+
+def _asph_check_or_raise(duration_sec: float) -> None:
+    """累计 ASPH 用量, 接近 7200s 软限时 raise (caller 持久化 wav 等 backfill).
+
+    设计选择 raise 而非 sleep 的原因:
+    - sleep 30分钟会卡死整个批, 用户不能接受
+    - raise 后 caller (bilibili.py) 捕获 RuntimeError → wav 持久化到 pending_audio/
+    - 下次跑批 backfill_pending.py 自动补转 (window 已重置)
+
+    滑动窗口逻辑:
+    - 1 小时窗口累计 _ASPH_USED
+    - 投影 = _ASPH_USED + duration_sec > 6500 → raise
+    """
+    global _ASPH_WINDOW_START, _ASPH_USED
+    import time as _t
+    now = _t.time()
+    if _ASPH_WINDOW_START == 0 or (now - _ASPH_WINDOW_START) > 3600:
+        _ASPH_WINDOW_START = now
+        _ASPH_USED = 0
+        # 窗口重置时同步到 state 文件
+        _groq_state_update({"asph_window_start": _ASPH_WINDOW_START, "asph_used": _ASPH_USED})
+
+    projected = _ASPH_USED + duration_sec
+    if projected > _ASPH_SOFT_LIMIT:
+        raise RuntimeError(
+            f"ASPH 软限接近: 已用 {_ASPH_USED:.0f}s + 投影 {duration_sec:.0f}s = "
+            f"{projected:.0f}s > {_ASPH_SOFT_LIMIT} 软限 (Groq 上限 7200s/h) — "
+            f"跳过本条, wav 已持久化到 pending_audio/ 等下次跑批 backfill"
+        )
+
+    _ASPH_USED += duration_sec
+    # 持久化到 state 文件
+    _groq_state_update({"asph_window_start": _ASPH_WINDOW_START, "asph_used": _ASPH_USED})
+
+
+def _resolve_bailian_bin():
+    found = shutil.which("bl") or shutil.which("bailian")
+    if found:
+        return found
+    # launchd daemon 启动时 PATH 缺失，回退到 npm-global
+    for name in ("bl", "bailian"):
+        cand = Path.home() / ".npm-global" / "bin" / name
+        if cand.exists():
+            return str(cand)
+    return None
+
+_BAILIAN_BIN = _resolve_bailian_bin()
+
+# ── Bailian ASR 模型池（按优先级排列，自动跳过耗尽模型）─────────────────────────
+# 2026-07-23 全量实测（bailian语音模型清单.md）:
+#   ✅ 本地文件支持: paraformer-mtl-v1, fun-asr-mtl*, fun-asr-2025-08-25, paraformer-8k-v1, fun-asr-2025-11-07
+#   ❌ 不支持本地文件: qwen3-asr-flash*, realtime*, gummy*, paraformer-realtime*, fun-asr-flash*
+#   ❌ 额度耗尽: fun-asr, paraformer-8k-v2, paraformer-v1/v2
+# TTL: 耗尽标记 12 小时后自动解锁（应付日额度次日重置场景）
+# 按真实剩余量排序（人工截图 2026-07-29 01:58）：
+#   fun-asr-mtl-2025-08-25: 54% (19,526/36,000)  ← 最多
+#   fun-asr-mtl:            40% (14,507/36,000)
+#   fun-asr-2025-11-07:     19%  (6,828/36,000)
+# 已排除：
+#   fun-asr-2025-08-25:  0% 配额耗尽（403）
+#   paraformer-mtl-v1:    已耗尽（2026-07-28 报告确认）
+#   paraformer-8k-v1:     已耗尽（模型列表.md 标注）
+#   fun-asr-flash/realtime 系列: 不支持本地文件上传
+_BAILIAN_MODEL_POOL = [
+    "fun-asr-mtl-2025-08-25",   # 剩余 19,526/36,000 (54%)，优先用
+    "fun-asr-mtl",              # 剩余 14,507/36,000 (40%)
+    "fun-asr-2025-11-07",       # 剩余  6,828/36,000 (19%)
+]
+_BAILIAN_EXHAUSTED = {}   # {model: unix_timestamp}，非空 = 已耗尽
+
+
+# ── ASR 配额缓存（爬取前由 check_bailian_quota.py 写入）────────────────────────
+_ASR_QUOTA_CACHE: dict | None = None  # {"model": {"pct": float, "available": bool, ...}}
+_STATE_FILE_ASR = Path(__file__).parent.parent / "state" / "bailian_quota.json"
+
+# 本地文件支持的 ASR 模型（bailian 限制，非所有模型都支持文件路径）
+# smoke test 实测支持本地文件上传的模型（2026-07-29）
+# ✅ 支持: fun-asr-mtl 系 (mtl in model)
+# ❌ 不支持: paraformer-mtl-v1(耗尽), paraformer-8k-v1(耗尽), fun-asr-2025-08-25(配额0%), fun-asr-flash/realtime 系列(400)
+_LOCAL_FILE_SUPPORTED = {
+    "fun-asr-mtl", "fun-asr-mtl-2025-08-25", "fun-asr-2025-11-07",
+}
+
+def _load_asr_quota_cache():
+    """读 bailian_quota.json，加载 ASR 模型配额。只执行一次。"""
+    global _ASR_QUOTA_CACHE
+    if _ASR_QUOTA_CACHE is not None:
+        return
+    try:
+        data = json.loads(_STATE_FILE_ASR.read_text())
+        raw = data.get("asr_models", {})
+        _ASR_QUOTA_CACHE = {
+            m: info for m, info in raw.items()
+            # smoke test: available=True 表示 SUBMIT_OK (ok=False 是 check_bailian_quota 的旧字段)
+            if info.get("available") and m in _LOCAL_FILE_SUPPORTED
+        }
+        print(f"  [bailian_asr] 配额缓存加载: {len(_ASR_QUOTA_CACHE)} 个可用模型", flush=True)
+    except Exception as e:
+        print(f"  [bailian_asr] 配额缓存加载失败: {e}，用硬编码池", flush=True)
+        _ASR_QUOTA_CACHE = {}
+
+
+# ── Bailian 单次调用状态标记（供 transcribe() 区分 empty/failed）─────────────────
+# 2026-07-22: EmptyOutput(视频无有效音频片段)与真失败(quota耗尽/超时/异常)需要区分.
+# 单棒 bailian 模式下, EmptyOutput 应该跳过不抛错让跑批继续;
+# 真失败应该抛 RuntimeError 让上层终止跑批.
+_BAILIAN_LAST = {"status": "ok"}  # "ok" | "empty" | "failed"
+
+def _bailian_mark(status, model=None):
+    """标记当前 bailian 调用的结果状态, 供 transcribe() 单棒段读取."""
+    _BAILIAN_LAST["status"] = status
+    if model:
+        _BAILIAN_LAST["model"] = model
+
+def _bailian_is_exhausted(model):
+    """检查模型是否已耗尽（含12h TTL）。"""
+    import time as _t
+    ts = _BAILIAN_EXHAUSTED.get(model, 0)
+    if not ts:
+        return False
+    if _t.time() - ts > 12 * 3600:
+        del _BAILIAN_EXHAUSTED[model]
+        return False
+    return True
+
+def _bailian_mark_exhausted(model):
+    """标记模型耗尽（含12h TTL）。"""
+    import time as _t
+    _BAILIAN_EXHAUSTED[model] = _t.time()
+    print(f"  [bailian] ⚠️ {model} 额度耗尽，12h 内跳过", flush=True)
+
+def _bailian_get_available_model(preferred=None):
+    """返回第一个未耗尽且支持本地文件的模型。
+    
+    优先顺序：
+    1. preferred（若可用且支持本地文件）
+    2. 缓存中剩余最多的模型
+    3. 硬编码池兜底
+    """
+    # 先检查 preferred
+    if preferred and not _bailian_is_exhausted(preferred):
+        if _ASR_QUOTA_CACHE is None or preferred in _ASR_QUOTA_CACHE:
+            return preferred
+
+    # 缓存优先：选剩余最多的
+    if _ASR_QUOTA_CACHE:
+        available = [
+            m for m, info in _ASR_QUOTA_CACHE.items()
+            if info.get("available") and not _bailian_is_exhausted(m)
+            and m in _LOCAL_FILE_SUPPORTED
+        ]
+        if available:
+            # pct 最大的排前面
+            available.sort(key=lambda m: -(_ASR_QUOTA_CACHE[m].get("pct") or 0))
+            return available[0]
+
+    # 兜底：硬编码池
+    for m in _BAILIAN_MODEL_POOL:
+        if not _bailian_is_exhausted(m) and m in _LOCAL_FILE_SUPPORTED:
+            return m
+    return None
+
+
+def _bailian_run(cmd, timeout):
+    """2026-07-16: 统一 bailian CLI 子进程执行器.
+    用 Popen + start_new_session + killpg 解决 hang 根因.
+
+    历史 bug: subprocess.run(timeout=10) 在 bailian CLI 子进程死锁时, kill 之后
+    Python 仍卡在 selectors.select 等 stdout pipe EOF, 因为 Node.js 子进程
+    持 stdout pipe 的引用不被回收.
+    解决: start_new_session=True 让 bailian 独立进程组, killpg 杀掉整组,
+    pipe 文件描述符立即关闭, communicate 立即返回.
+
+    Args:
+        cmd: 命令列表
+        timeout: 硬超时 (秒), 超时抛 TimeoutExpired
+
+    Returns:
+        (stdout_str, stderr_str, returncode)
+
+    Raises:
+        subprocess.TimeoutExpired
+    """
+    import os
+    proc = subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        start_new_session=True,  # 独立进程组, killpg 才能杀干净
+    )
+    try:
+        stdout, stderr = proc.communicate(timeout=timeout)
+        return stdout or "", stderr or "", proc.returncode
+    except subprocess.TimeoutExpired:
+        # 杀整个进程组 (Node.js 可能 fork 出 grandchild)
+        try:
+            os.killpg(os.getpgid(proc.pid), 9)  # SIGKILL
+        except (ProcessLookupError, PermissionError):
+            pass
+        # 等子进程死亡清理 pipe (最关键: 必须超时, 否则 hang)
+        try:
+            proc.communicate(timeout=2)
+        except Exception:
+            pass
+        raise
+
+
+def _bailian_submit(wav_path, model="fun-asr-2025-11-07", language="zh", submit_timeout=None):
+    """提交 ASR 任务 (--async 模式), 返回 task_id 或抛 RuntimeError.
+    2026-07-18: submit_timeout 自适应——大文件(如1小时视频113MB)上传耗时长,
+    原硬编码 20s 会导致 submit 超时; 按文件大小估算(1.5s/MB +10s 余量),
+    下限 20s, 上限 120s."""
+    if submit_timeout is None:
+        try:
+            sz_mb = os.path.getsize(wav_path) / 1_000_000
+            submit_timeout = max(20, min(120, int(sz_mb * 1.5) + 10))
+        except Exception:
+            submit_timeout = 20
+    try:
+        stdout, stderr, rc = _bailian_run(
+            [_BAILIAN_BIN, "speech", "recognize",
+             "--url", str(wav_path),
+             "--model", model,
+             "--language", language,
+             "--async"],
+            timeout=submit_timeout,
+        )
+    except subprocess.TimeoutExpired:
+        raise RuntimeError(f"submit 超时 {submit_timeout}s")
+    if rc != 0:
+        err = (stderr or stdout or "").lower()
+        # 检测额度耗尽
+        if any(k in err for k in ["403", "free tier", "freetieronly", "quota", "exhaust", "allocation"]):
+            _bailian_mark_exhausted(model)
+        raise RuntimeError(f"submit rc={rc}: {(stderr or stdout)[:200]}")
+    for line in (stdout or "").splitlines():
+        line = line.strip()
+        if line.startswith("task_id:"):
+            return line.split(":", 1)[1].strip()
+    raise RuntimeError(f"submit 未返回 task_id: {stdout[:200]}")
+
+
+def _bailian_poll_status(task_id, get_timeout=10):
+    """查 task 状态. 返回 (status, transcription_url, raw_text).
+    raw_text 保留百炼完整输出, 供 FAILED 时诊断真实错误(避免黑盒)."""
+    try:
+        stdout, stderr, rc = _bailian_run(
+            [_BAILIAN_BIN, "video", "task", "get", "--task-id", task_id],
+            timeout=get_timeout,
+        )
+    except subprocess.TimeoutExpired:
+        return "TIMEOUT", None, ""
+    raw = stdout or ""
+    status = None
+    trans_url = None
+    for line in raw.splitlines():
+        s = line.strip()
+        if s.startswith("task_status:"):
+            status = s.split(":", 1)[1].strip()
+        elif s.startswith("transcription_url:"):
+            trans_url = s.split(":", 1)[1].strip()
+    return status, trans_url, raw
+
+
+
+
+def _run_subprocess_with_timeout(cmd, timeout):
+    """通用子进程超时执行器（与 _bailian_run 相同机制，解决 hang 问题）。"""
+    import os
+    proc = subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        start_new_session=True,
+    )
+    try:
+        stdout, stderr = proc.communicate(timeout=timeout)
+        return stdout or "", stderr or "", proc.returncode
+    except subprocess.TimeoutExpired:
+        try:
+            os.killpg(os.getpgid(proc.pid), 9)
+        except (ProcessLookupError, PermissionError):
+            pass
+        try:
+            proc.communicate(timeout=5)
+        except Exception:
+            pass
+        raise  # 重新抛出 TimeoutExpired，由 caller 的 except subprocess.TimeoutExpired 处理
+
+def _bailian_print_error(raw, label="bailian"):
+    """从百炼返回中抽取错误相关行, 避免 FAILED 黑盒.
+    命中 error/fail/reason/quota/403/429/... 关键词才打印, 否则原样截断打印."""
+    if not raw:
+        print(f"  [{label}] FAILED 但无原始返回可诊断", flush=True)
+        return
+    keys = ("error", "fail", "reason", "quota", "403", "429", "reject",
+            "invalid", "exhaust", "limit", "throttl", "busy", "timeout")
+    hit = [ln.strip() for ln in raw.splitlines() if any(k in ln.lower() for k in keys)]
+    if hit:
+        for h in hit[:6]:
+            print(f"  [{label}] {h[:200]}", flush=True)
+    else:
+        print(f"  [{label}] 原始返回(无错误关键词): {raw[:300]}", flush=True)
+
+
+def _bailian_fetch_text(transcription_url, fetch_timeout=30):
+    """从 transcription_url 下载 JSON, 返回 transcripts[0].text 或 ''.
+
+    2026-07-22: sensevoice-v1 输出含 <|Speech|>...</|/Speech|> <|NEUTRAL|> 等特殊 token,
+    这些 token 是 sensevoice 内部情感/事件标签, 不应写入 vault. 提取时统一 strip.
+    """
+    try:
+        stdout, stderr, rc = _bailian_run(
+            ["curl", "-s", "--max-time", str(fetch_timeout), transcription_url],
+            timeout=fetch_timeout + 5,
+        )
+    except subprocess.TimeoutExpired:
+        return ""
+    if rc != 0 or not stdout:
+        return ""
+    try:
+        data = json.loads(stdout)
+        transcripts = data.get("transcripts") or []
+        if transcripts:
+            text = (transcripts[0].get("text") or "").strip()
+            # strip sensevoice 特殊 token (<|Speech|>, <|/Speech|>, <|NEUTRAL|>, <|/NEUTRAL|>, ...)
+            text = re.sub(r"<\|[^|]+\|>", "", text).strip()
+            return text
+    except Exception as e:
+        print(f"  [bailian] JSON parse err: {e}", flush=True)
+    return ""
+
+
+# ════════════════════════════════════════════════════════════════════════════════
+# 2026-07-20: 公开异步 ASR API (给三段式 worker 池用)
+# 把 _bailian_submit / _bailian_poll_status / _bailian_fetch_text 三个底层函数
+# 暴露为公开 API, 并新增 transcribe_bailian_async() 给 worker 调用.
+# 旧的 transcribe_bailian() / transcribe() 完全不变 (向后兼容).
+# 返回结构: {"status", "text", "task_id", "transcription_url", "raw", "duration_s", "retries", "model"}
+# status: SUCCEEDED / FAILED / TIMEOUT / NO_AUDIO
+# ════════════════════════════════════════════════════════════════════════════════
+
+
+def submit_async(wav_path, model="fun-asr-2025-11-07", language="zh", submit_timeout=None):
+    """公开版 _bailian_submit. 提交 ASR 任务 (--async 模式), 返回 task_id 或抛 RuntimeError.
+    给 worker 池用: 拿到 task_id 后 push 到 SQLite 持久化, 进程崩了重启能续轮询.
+    """
+    return _bailian_submit(wav_path, model=model, language=language, submit_timeout=submit_timeout)
+
+
+def poll_async(task_id, get_timeout=10):
+    """公开版 _bailian_poll_status. 查 task 状态. 返回 (status, transcription_url, raw_text).
+    raw_text 保留百炼完整输出, 供 FAILED 时诊断真实错误(避免黑盒).
+    worker 每 5s 轮询一次, 直到 SUCCEEDED 或 FAILED 或软超时.
+    """
+    return _bailian_poll_status(task_id, get_timeout=get_timeout)
+
+
+def fetch_async(transcription_url, fetch_timeout=30):
+    """公开版 _bailian_fetch_text. 从 transcription_url 下载 JSON, 返回 transcripts[0].text 或 ''.
+    worker 在 poll_async 返回 SUCCEEDED 后调用本函数拿转录文本.
+    """
+    return _bailian_fetch_text(transcription_url, fetch_timeout=fetch_timeout)
+
+
+def transcribe_bailian_async(wav_path, model=None, language="zh",
+                              soft_timeout=300, audio_secs=None, max_retry=1):
+    """worker 友好的高层封装: submit + poll + fetch 三段合一, 但返回结构化结果供持久化.
+    model=None 时自动从模型池选可用模型，耗尽自动切换.
+
+    Args:
+        wav_path: 本地 wav 文件路径
+        model: bailian 模型名 (None=自动池选; 默认 fun-asr-2025-11-07)
+        language: zh / en / ja
+        soft_timeout: 总软超时 (秒), 超过返回 TIMEOUT 状态而非空字符串 (区别于旧 API)
+        audio_secs: 音频时长 (秒), 传 None 时自动探测; 用于软超时自适应
+        max_retry: 偶发失败重试次数 (SUCCESS_WITH_NO_VALID_FRAGMENT 等硬失败不重试)
+
+    Returns:
+        dict: {"status", "text", "task_id", "transcription_url", "raw", "duration_s", "retries", "model"}
+    """
+    import time as _time
+    t0 = _time.time()
+    if audio_secs is None or audio_secs <= 0:
+        try:
+            audio_secs = get_audio_duration(wav_path)
+        except Exception:
+            audio_secs = 0
+    # 自适应软超时: 短音频保底 120s, 长音频按 audio_secs//3+40 算, 封顶 soft_timeout
+    effective_timeout = max(120, min(soft_timeout, int(audio_secs // 3) + 40))
+
+    result = {
+        "status": "TIMEOUT",
+        "text": "",
+        "task_id": None,
+        "transcription_url": None,
+        "raw": "",
+        "duration_s": 0.0,
+        "retries": 0,
+        "model": model,
+    }
+
+    for attempt in range(max_retry + 1):
+        # 自动选模型（首次 + 每次换模型时）
+        if model is None or _bailian_is_exhausted(model):
+            model = _bailian_get_available_model()
+            if model is None:
+                print(f"  [bailian_async] 所有模型均耗尽，跳过", flush=True)
+                result["status"] = "FAILED"
+                result["raw"] = "all_models_exhausted"
+                return result
+            result["model"] = model
+            print(f"  [bailian_async] 自动选用: {model}", flush=True)
+
+        result["retries"] = attempt
+        try:
+            task_id = submit_async(wav_path, model=model, language=language)
+            result["task_id"] = task_id
+            print(f"  [bailian_async] task_id={task_id}, 提交 {model}" + (f" (重试 {attempt})" if attempt else ""), flush=True)
+        except Exception as e:
+            err_str = str(e).lower()
+            if any(k in err_str for k in ["403", "quota", "free tier", "freetieronly", "allocation", "exhaust"]):
+                _bailian_mark_exhausted(model)
+                print(f"  [bailian_async] {model} 额度耗尽，切换模型", flush=True)
+                continue  # 换模型重试
+            print(f"  [bailian_async] submit err: {e}", flush=True)
+            if False:  # 旧逻辑已移除
+                continue
+            result["status"] = "FAILED"
+            result["raw"] = str(e)
+            result["duration_s"] = _time.time() - t0
+            return result
+
+        # ── Poll loop ──
+        poll_interval = 5
+        max_polls = max(1, effective_timeout // poll_interval)
+        for i in range(1, max_polls + 1):
+            _time.sleep(3 if i == 1 else poll_interval)
+            elapsed = _time.time() - t0
+            if elapsed > effective_timeout:
+                print(f"  [bailian_async] 软超时 {effective_timeout}s, fallback", flush=True)
+                result["status"] = "TIMEOUT"
+                result["duration_s"] = elapsed
+                return result
+            try:
+                status, url, raw = poll_async(task_id)
+            except Exception as e:
+                print(f"  [bailian_async] poll #{i} err: {e}", flush=True)
+                continue
+            result["raw"] = raw
+            if status == "SUCCEEDED":
+                result["transcription_url"] = url
+                print(f"  [bailian_async] SUCCEEDED (poll #{i}, {elapsed:.0f}s)", flush=True)
+                break
+            if status == "FAILED":
+                _bailian_print_error(raw, "bailian_async")
+                raw_lower = raw.lower()
+                if any(k in raw_lower for k in ["quota", "403", "free tier", "freetieronly", "allocation", "exhaust"]):
+                    _bailian_mark_exhausted(model)
+                    print(f"  [bailian_async] {model} 额度耗尽，切换模型", flush=True)
+                    break  # 换模型重试
+                if "SUCCESS_WITH_NO_VALID_FRAGMENT" in raw or "InvalidFile.EmptyOutput" in raw:
+                    print(f"  [bailian_async] 视频无有效音频片段(EmptyOutput, 抖音常见), NO_AUDIO", flush=True)
+                    result["status"] = "NO_AUDIO"
+                    result["duration_s"] = elapsed
+                    return result
+                if False:  # 旧逻辑已移除
+                    print(f"  [bailian_async] 偶发失败, 重试", flush=True)
+                    break  # 外层重新 submit
+                result["status"] = "FAILED"
+                result["duration_s"] = elapsed
+                return result
+            if status == "TIMEOUT":
+                continue
+            if i % 3 == 0 or elapsed > 30:
+                print(f"  [bailian_async] poll #{i} ({elapsed:.0f}s) status={status}", flush=True)
+        else:
+            # poll 循环正常退出 (= 软超时)
+            result["status"] = "TIMEOUT"
+            result["duration_s"] = _time.time() - t0
+            return result
+
+        # ── Fetch text ──
+        if not result["transcription_url"]:
+            print(f"  [bailian_async] SUCCEEDED 但无 transcription_url", flush=True)
+            result["status"] = "FAILED"
+            result["duration_s"] = _time.time() - t0
+            return result
+        text = fetch_async(result["transcription_url"], fetch_timeout=30)
+        result["text"] = text
+        result["status"] = "SUCCEEDED"
+        result["duration_s"] = _time.time() - t0
+        print(f"  [bailian_async] {model}, 总耗时 {result['duration_s']:.1f}s, {len(text)} chars", flush=True)
+        return result
+
+    # 所有重试用尽仍未成功
+    result["status"] = "FAILED"
+    result["duration_s"] = _time.time() - t0
+    return result
+
+
+# ════════════════════════════════════════════════════════════════════════════════
+# 2026-07-20: apply_transcript (worker 调用, 三段式队列 stage2 完成后写回 md)
+# 给 stage2 worker 调用: 读已有 md, 更新 frontmatter + 注入 ## 转录 段
+# ════════════════════════════════════════════════════════════════════════════════
+
+
+def _update_md_frontmatter(md_text, updates):
+    """替换 frontmatter 中的 key=value 行 (如果 key 不存在则插入到第二个 --- 之前).
+    updates: dict {key: value} (值会被转为 str)
+    """
+    lines = md_text.split("\n")
+    if len(lines) < 2 or not lines[0].startswith("---"):
+        return md_text  # 无 frontmatter, 不动
+    # 找到第二个 --- 行 (关闭符)
+    close_idx = None
+    for i in range(1, len(lines)):
+        if lines[i].strip() == "---":
+            close_idx = i
+            break
+    if close_idx is None:
+        return md_text  # 不完整的 frontmatter, 不动
+
+    seen_keys = set()
+    new_fm = []
+    for line in lines[1:close_idx]:
+        m = re.match(r"^([A-Za-z_][A-Za-z0-9_]*):\s*(.*)$", line)
+        if m and m.group(1) in updates:
+            new_fm.append(f"{m.group(1)}: {updates[m.group(1)]}")
+            seen_keys.add(m.group(1))
+        else:
+            new_fm.append(line)
+
+    # 补齐未出现的 key
+    for k, v in updates.items():
+        if k not in seen_keys:
+            new_fm.append(f"{k}: {v}")
+
+    return "\n".join([lines[0]] + new_fm + lines[close_idx:])
+
+
+def _replace_or_insert_section(md_text, section_header, body):
+    """查找 section_header (如 '## 转录'), 存在则替换到下一个 ## 之前, 不存在则插到文本末尼.
+    body: 要插入的正文 (已包含 换行 等).
+    """
+    lines = md_text.split("\n")
+    # 查找 section_header 行
+    start_idx = None
+    for i, line in enumerate(lines):
+        if re.match(rf"^\s*{re.escape(section_header)}\s*$", line):
+            start_idx = i
+            break
+    if start_idx is None:
+        # 插入到末尾
+        sep = "\n\n" if md_text and not md_text.endswith("\n") else "\n"
+        return md_text + sep + section_header + "\n\n" + body.rstrip() + "\n"
+    # 查找下一个 ## 行 (未在 code block 内)
+    end_idx = len(lines)
+    in_code = False
+    for i in range(start_idx + 1, len(lines)):
+        if lines[i].strip().startswith("```"):
+            in_code = not in_code
+            continue
+        if not in_code and re.match(r"^##\s", lines[i]):
+            end_idx = i
+            break
+    body_lines = body.rstrip().split("\n")
+    new_lines = lines[:start_idx] + [section_header, ""] + body_lines + [""] + lines[end_idx:]
+    return "\n".join(new_lines)
+
+
+def apply_transcript(md_path, text, source="unknown", overwrite=True):
+    """worker 完成转录后调用: 更新 frontmatter + 注入 ## 转录 段.
+
+    Args:
+        md_path: md 文件路径
+        text: 转录文本
+        source: 转录来源标签 ('bailian' | 'mlx' | 'groq' | 'local_whisper' 等)
+        overwrite: 如果已有 ## 转录 段是否覆盖
+    Returns:
+        bool: True 表示成功写入, False 表示跳过
+    """
+    p = Path(md_path)
+    if not p.exists():
+        raise FileNotFoundError(md_path)
+    md = p.read_text(encoding="utf-8")
+
+    if not overwrite and re.search(r"^##\s*转录\s*$", md, re.M):
+        print(f"  [apply_transcript] {p.name} 已有 ## 转录 段, 跳过", flush=True)
+        return False
+
+    # 1) 更新 frontmatter
+    fm_updates = {
+        "transcript_source": source,
+        "transcript_available": "true",
+        "transcript_pending": "false",
+    }
+    md = _update_md_frontmatter(md, fm_updates)
+
+    # 2) 注入 ## 转录 段
+    section_label = f"## 转录 (来源: {source})" if source else "## 转录"
+    md = _replace_or_insert_section(md, section_label.split(" (")[0], text)
+
+    p.write_text(md, encoding="utf-8")
+    print(f"  [apply_transcript] {p.name} 写入 {len(text)} chars (source={source})", flush=True)
+    return True
+
+
+def transcribe_local_async(wav_path, model_name="base", language="zh", beam_size=5):
+    """worker 友好的 mlx-whisper 封装. 返回结构化 dict (与 transcribe_bailian_async 同形).
+    mlx 是本地同步调用, 不需要 submit/poll, 直接一条 API 返回结果.
+    """
+    import time as _time
+    t0 = _time.time()
+    result = {
+        "status": "FAILED",
+        "text": "",
+        "task_id": None,
+        "transcription_url": None,
+        "raw": "",
+        "duration_s": 0.0,
+        "retries": 0,
+        "model": f"mlx:{model_name}",
+    }
+    try:
+        import mlx_whisper
+        repo = _MLX_REPO.get(model_name, _MLX_REPO["base"])
+        res = mlx_whisper.transcribe(wav_path, path_or_hf_repo=repo, language=language)
+        if isinstance(res, tuple):
+            text = res[0]
+        elif isinstance(res, dict):
+            text = res.get("text", "")
+        else:
+            text = res
+        text = (text or "").strip()
+        result["text"] = text
+        result["status"] = "SUCCEEDED" if text else "NO_AUDIO"
+        result["duration_s"] = _time.time() - t0
+        print(f"  [mlx_async] {repo}, {result['duration_s']:.1f}s, {len(text)} chars", flush=True)
+    except Exception as e:
+        result["raw"] = str(e)
+        result["duration_s"] = _time.time() - t0
+        print(f"  [mlx_async] error: {e}", flush=True)
+    return result
+
+
+def transcribe_bailian(wav_path, model=None, language="zh", timeout=300, audio_secs=None):
+    """2026-07-21 v4: Bailian ASR 模型池自动切换。
+    model=None 时自动从模型池选第一个可用模型；
+    遇到额度耗尽自动切下一个模型，直到全部耗尽返回空字符串。
+    默认 fun-asr-2025-11-07（需 OpenAPI AK/SK）。
+    """
+    # 自动选模型
+    if model is None:
+        model = _bailian_get_available_model()
+        if model is None:
+            print(f"  [bailian] ⚠️ 所有模型均耗尽，跳过", flush=True)
+            return ""
+        print(f"  [bailian] 自动选用模型: {model}", flush=True)
+
+    t0 = time.time()
+    # 允许换模型重试（当前模型耗尽/失败切到下一个）
+    _attempt = 0
+    while True:
+        _attempt += 1
+        if _attempt > len(_BAILIAN_MODEL_POOL):
+            print(f"  [bailian] ⚠️ 所有模型均已尝试，全部失败", flush=True)
+            _bailian_mark("failed", model)
+            return ""
+        try:
+            # ── Step 1: 提交 ASR 任务 (--async) ──
+            task_id = _bailian_submit(wav_path, model=model, language=language)
+            print(f"  [bailian] task_id={task_id}, 提交 {model} (第{_attempt}次)", flush=True)
+
+            # ── Step 2: 手动 polling ──
+            poll_interval = 5
+            max_polls = max(1, timeout // poll_interval)
+            # soft_timeout 真·自适应：按音频时长派生，短视频保底 120s 不拖、长视频给满红线。
+            # 原硬编码 60s 过紧(长音频在 bailian 仍处理中被早退线掐掉误降级 mlx)；
+            # 280s 固定版又对短视频卡死时干等太久。现按 audio_secs//3+40 算，封顶 300(=timeout)。
+            # 没传 audio_secs 时自行读一次(异常兜底为 0 -> 走保底 120s)。
+            if audio_secs is None or audio_secs <= 0:
+                try:
+                    audio_secs = get_audio_duration(wav_path)
+                except Exception:
+                    audio_secs = 0
+            soft_timeout = max(120, min(300, int(audio_secs // 3) + 40))
+            trans_url = None
+            status = None
+            for i in range(1, max_polls + 1):
+                time.sleep(3 if i == 1 else poll_interval)
+                elapsed = time.time() - t0
+                if elapsed > soft_timeout and status != "SUCCEEDED":
+                    print(f"  [bailian] 软超时 {soft_timeout}s (status={status}), fallback", flush=True)
+                    _bailian_mark("failed", model)
+                    return ""
+                try:
+                    status, url, raw = _bailian_poll_status(task_id)
+                except subprocess.TimeoutExpired:
+                    print(f"  [bailian] poll #{i} ({elapsed:.0f}s) 超时, 继续", flush=True)
+                    continue
+                except Exception as e:
+                    print(f"  [bailian] poll #{i} ({elapsed:.0f}s) err: {e}", flush=True)
+                    continue
+                if status == "SUCCEEDED":
+                    trans_url = url
+                    print(f"  [bailian] poll #{i} ({elapsed:.0f}s) SUCCEEDED", flush=True)
+                    break
+                if status == "FAILED":
+                    print(f"  [bailian] FAILED (poll #{i}, {elapsed:.0f}s)", flush=True)
+                    _bailian_print_error(raw, "bailian")
+                    # 检测额度耗尽 → 切模型
+                    raw_lower = raw.lower()
+                    if any(k in raw_lower for k in ["quota", "403", "free tier", "freetieronly", "allocation", "exhaust"]):
+                        _bailian_mark_exhausted(model)
+                        next_model = _bailian_get_available_model()
+                        if next_model and next_model != model:
+                            print(f"  [bailian] 额度耗尽，切换到 {next_model}", flush=True)
+                            model = next_model
+                            break  # 换模型重试
+                        else:
+                            print(f"  [bailian] 无可用模型了", flush=True)
+                            _bailian_mark("failed", model)
+                            return ""
+                    if "SUCCESS_WITH_NO_VALID_FRAGMENT" in raw or "InvalidFile.EmptyOutput" in raw:
+                        print(f"  [bailian] 视频无有效音频片段(EmptyOutput, 抖音常见: 纯音乐/图片), 跳过", flush=True)
+                        _bailian_mark("empty", model)
+                        return ""
+                    if False:  # 旧逻辑已移除
+                        print(f"  [bailian] 偶发失败，切换下一模型重试", flush=True)
+                        break  # 跳出 poll, 外层重新 submit
+                    _bailian_mark("failed", model)
+                    return ""
+                if i % 3 == 0 or elapsed > 30:
+                    print(f"  [bailian] poll #{i} ({elapsed:.0f}s) status={status}", flush=True)
+            else:
+                print(f"  [bailian] 超时 ({timeout}s, {max_polls} 次), fallback", flush=True)
+                _bailian_mark("failed", model)
+                return ""
+
+            # ── Step 3: 下载 transcription JSON ──
+            if not trans_url:
+                print(f"  [bailian] SUCCEEDED 但无 transcription_url (EmptyOutput)", flush=True)
+                _bailian_mark("empty", model)
+                return ""
+            text = _bailian_fetch_text(trans_url, fetch_timeout=30)
+            dur = time.time() - t0
+            if not text:
+                _bailian_mark("empty", model)
+                return ""
+            # 2026-07-23: bailian 返回纯文本无时间戳，用句子数 heuristic 切段落
+            text = _split_into_paragraphs(text, min_para_chars=80, max_sentences_per_para=5)
+            print(f"  [bailian] {model}, 总耗时 {dur:.1f}s, {len(text)} chars, "
+                  f"段落≈{text.count(chr(10)+chr(10))+1}", flush=True)
+            _bailian_mark("ok", model)
+            return text
+        except subprocess.TimeoutExpired:
+            print(f"  [bailian] 提交超时 ({timeout}s)", flush=True)
+            _bailian_mark("failed", model)
+            return ""
+        except Exception as e:
+            print(f"  [bailian] error: {e}", flush=True)
+            _bailian_mark("failed", model)
+            return ""
+    return ""
+
+
+
+def _split_into_paragraphs(text: str, min_para_chars: int = 100,
+                            max_sentences_per_para: int = 6) -> str:
+    """把连续文本切成有标点、有段落的大纲文本。
+
+    策略：
+      1. 用中文句子边界（。！？…）切句子
+      2. 每 N 句合一段（避免单句成段，也避免一整篇一段）
+      3. 段间空一行保留可读性
+    这是兜底 heuristic，适用于 bailian（无时间戳）和 mlx 未开启 word_timestamps 时。
+    """
+    import re
+    # 句子切分：保留标点在句尾
+    sentences = re.split(r'(?<=[。！？…])', text)
+    sentences = [s.strip() for s in sentences if s.strip()]
+    if not sentences:
+        return text
+
+    # 合并短句，避免单句成段（<15字的句子并入下一段）
+    merged = []
+    buf = ""
+    for s in sentences:
+        if len(buf) < 15:
+            buf = (buf + s).strip()
+        else:
+            merged.append(buf)
+            buf = s
+    if buf.strip():
+        merged.append(buf.strip())
+
+    # 按 max_sentences_per_para 分组
+    paras = []
+    for i in range(0, len(merged), max_sentences_per_para):
+        chunk = "".join(merged[i:i + max_sentences_per_para])
+        if len(chunk) >= min_para_chars or i == 0:
+            paras.append(chunk)
+        else:
+            # 并入上一段
+            if paras:
+                paras[-1] += chunk
+
+    return "\n\n".join(paras) if paras else text
+
+def transcribe_mlx(wav_path, model_name="medium", language="zh", beam_size=5,
+                   timeout=600, audio_secs=None):
+    """MLX本地转录 (Apple ANE 加速).
+    model_name: tiny/base/small/medium/large，默认 medium（2026-07-23 升级，small 中文标点差）
+    timeout: 秒，默认 600
+    """
+    import mlx_whisper
+    repo = _MLX_REPO.get(model_name, _MLX_REPO["medium"])
+    print(f"  [mlx] 加载模型 {repo}", flush=True)
+    t0 = time.time()
+    try:
+        # 2026-08-07: 加 initial_prompt 引导中文标点 (跟 groq 用同一英文 prompt, 避免中文 prompt 幻觉残留)
+        # 之前 mlx 默认 0 标点 → 读起来全是空格; 改后效果待实测
+        # 旧中文 prompt "以下是普通话, 请加上标点符号..." 会被 whisper 幻觉成音频内容 (c8cfd3e 教训)
+        _mlx_punct_prompt = "Chinese, formal, with proper punctuation."
+        res = mlx_whisper.transcribe(
+            wav_path,
+            path_or_hf_repo=repo,
+            language=language,
+            # 2026-07-23: 开启词级时间戳，用段落间静音间隔切段落
+            word_timestamps=True,
+            # 2026-08-07: 引导中文标点 (跟 groq 同 prompt, 避免幻觉残留)
+            initial_prompt=_mlx_punct_prompt,
+        )
+        elapsed = time.time() - t0
+        dur_s = res.get("duration_s", 0)
+        ratio = elapsed / dur_s if dur_s > 0 else 0
+
+        # ── 段落分割：按 segment 间静音时长切段 ──────────────────────────
+        # 规则：两 segment 之间 >1.2s 静音 → 段落断点
+        # 每个段内保留 mlx_whisper 自带标点
+        segments = res.get("segments") or []
+        if segments:
+            parts = []
+            current = []
+            last_end = 0.0
+            for seg in segments:
+                start = seg.get("start", 0)
+                if current and (start - last_end) > 1.2:
+                    parts.append("".join(s.get("text", "") for s in current).strip())
+                    current = []
+                current.append(seg)
+                last_end = seg.get("end", last_end)
+            if current:
+                parts.append("".join(s.get("text", "") for s in current).strip())
+            text = "\n\n".join(p for p in parts if p.strip())
+        else:
+            text = res.get("text", "").strip()
+
+        print(f"  [mlx] {repo}, 音频{dur_s:.0f}s, 推理{elapsed:.1f}s (RTF={ratio:.2f}x), "
+              f"{len(text)} chars, 段落≈{text.count(chr(10)+chr(10))+1}",
+              flush=True)
+        return text
+    except Exception as e:
+        print(f"  [mlx] error: {e}", flush=True)
+        raise
+
+
+# ═══════════════════════════════════════════════════════
+# 主入口
+# ═══════════════════════════════════════════════════════
+
+def transcribe(source, headers=None, tmp_dir=None, keep_wav_on_fail=False,
+                 deferred=None, deferred_meta=None, deadline_sec=180):
+    """统一转录入口 (2026-08-07 引擎可切换版).
+
+    引擎选择 (优先级从高到低):
+      1. 环境变量 FORCE_GROQ=1            → 强制 groq
+      2. 环境变量 FORCE_MLX/FORCE_LOCAL=1 → 强制 mlx (本地)
+      3. config.transcription.engine      (默认 mlx, 无VPN期间)
+      4. config.transcription.primary      (旧字段, 兜底)
+
+    - engine=groq: 走 Groq Whisper API (需海外出口IP/VPN). 失败 raise RuntimeError.
+    - engine=mlx:  走本地 mlx_whisper (离线零依赖, 模型取 config.transcription.local.model,
+                  默认 small). 失败 raise RuntimeError.
+    Bailian / Tencent 函数定义仍保留, 但本入口不调用.
+    transcribe() 失败时 raise RuntimeError, 由 caller 决定 try/except 跳过或 propagate.
+
+    Args:
+        source: 音频文件路径 或 视频 URL (ffmpeg 直接抽音频)
+        headers: HTTP headers dict (URL 鉴权用)
+        tmp_dir: 临时目录 (默认自动创建 + 退出时清理)
+        keep_wav_on_fail: 失败时是否保留 wav (供 caller 调试)
+        deferred: **不再使用** (保留仅为 API 兼容). 失败不静默, 直接 raise.
+        deferred_meta: **不再使用** (保留仅为 API 兼容)
+        deadline_sec: **不再使用** (保留仅为 API 兼容)
+
+    Returns:
+        (transcript_text, "groq" | "groq_429" | "mlx")
+
+    Raises:
+        RuntimeError: 所选引擎失败 / 限流 / disabled / 无 key / audio 抽不到
+    """
+    global _GROQ_DISABLED, _GROQ_CONSECUTIVE_429
+
+    _load_asr_quota_cache()  # quota cache load is harmless even when Groq-only
+
+    config = load_config()
+    tc = config.get("transcription", {})
+
+    # ── 引擎解析 (2026-08-07: 支持无VPN时切本地mlx) ──
+    # 优先级: FORCE_GROQ=1 > FORCE_MLX/FORCE_LOCAL=1 > config.engine > config.primary > "groq"
+    _engine = str(tc.get("engine") or tc.get("primary") or "groq").lower()
+    if os.environ.get("FORCE_GROQ", "") in ("1", "true", "yes"):
+        _engine = "groq"
+    elif os.environ.get("FORCE_MLX", "") in ("1", "true", "yes") or \
+         os.environ.get("FORCE_LOCAL", "") in ("1", "true", "yes"):
+        _engine = "mlx"
+    if _engine not in ("groq", "mlx"):
+        _engine = "groq"
+    print(f"  [transcribe] engine={_engine} "
+          f"(config.engine={tc.get('engine')!r}, FORCE_GROQ={os.environ.get('FORCE_GROQ','')!r})",
+          flush=True)
+
+    groq_enabled = bool(tc.get("groq", {}).get("enabled", False))
+    groq_model = tc.get("groq", {}).get("model", "whisper-large-v3")
+    mlx_model = tc.get("local", {}).get("model", "small") or "small"
+
+    # 判断 source 类型
+    is_url = bool(source and re.match(r'^https?://', str(source)))
+    is_local = bool(source and os.path.exists(str(source)))
+    if not is_url and not is_local:
+        raise RuntimeError(f"invalid source (not URL or existing path): {str(source)[:100]}")
+
+    # 临时目录
+    if tmp_dir is None:
+        tmp_ctx = tempfile.TemporaryDirectory()
+        tmp_dir = tmp_ctx.name
+    else:
+        tmp_ctx = None
+
+    try:
+        wav_path = os.path.join(tmp_dir, "audio.wav")
+        if is_url:
+            print(f"  [audio] 从 URL 流式抽取音频...", flush=True)
+            ok = extract_audio_to_wav(source, wav_path, headers=headers)
+        else:
+            print(f"  [audio] 本地文件转 WAV...", flush=True)
+            ok = extract_audio_to_wav(source, wav_path)
+        if not ok:
+            raise RuntimeError(f"audio extraction failed for {str(source)[:100]}")
+
+        # ── 引擎路由 ──────────────────────────────────────
+        if _engine == "mlx":
+            # 本地 mlx_whisper: 离线零依赖, 不读代理/不联网. 模型取 config.transcription.local.model
+            print(f"  [transcribe] 走本地 mlx ({mlx_model})", flush=True)
+            text = transcribe_mlx(wav_path, model_name=mlx_model, language="zh")
+            if not text:
+                raise RuntimeError(f"MLX ASR 返回空 (model={mlx_model}) — 检查模型权重是否缓存")
+            print(f"  [mlx] 成功 {len(text)} chars", flush=True)
+            return text, "mlx"
+
+        # 仅 Groq 链路 (以下保持原逻辑不变)
+        if not groq_enabled:
+            raise RuntimeError("Groq disabled in config (transcription.groq.enabled=false) — 极简模式: 无 fallback, 修复 config 后再跑")
+        if _GROQ_DISABLED:
+            raise RuntimeError("Groq API key 已 401 (永久禁用, _GROQ_DISABLED=True) — 重启 supervisor 进程可重置, 或检查 key 是否过期")
+        groq_key = get_groq_key()
+        if not groq_key:
+            raise RuntimeError("Groq API key 未配置 (~/.agents/credentials/ominicrawl/groq.json 不存在或为空)")
+
+        import time as _t_groq
+        # 重新从 state 文件加载，确保 fork 后子进程能看到最新的 cooldown 状态
+        _loaded_state = _groq_state_load()
+        _GROQ_COOLDOWN_UNTIL = _loaded_state.get("cooldown_until", 0.0)
+        _GROQ_CONSECUTIVE_429 = _loaded_state.get("consecutive_429", 0)
+        if _loaded_state.get("disabled"):
+            _GROQ_DISABLED = True
+        if _GROQ_COOLDOWN_UNTIL > _t_groq.time():
+            remain = int(_GROQ_COOLDOWN_UNTIL - _t_groq.time())
+            raise RuntimeError(
+                f"Groq cooldown 中 (还剩 {remain}s, _GROQ_COOLDOWN_UNTIL={_GROQ_COOLDOWN_UNTIL:.0f}, "
+                f"_GROQ_CONSECUTIVE_429={_GROQ_CONSECUTIVE_429}) — 等 cooldown 结束或重启 supervisor"
+            )
+        if _GROQ_CONSECUTIVE_429 >= 2:
+            raise RuntimeError(
+                f"Groq 连续 {_GROQ_CONSECUTIVE_429} 次 429 (本批不会再回 Groq) — "
+                f"等明天或检查 key 配额, 极简模式: 无 bailian/mlx fallback"
+            )
+
+        # A3 (2026-08-01): wav > 1MB 自动转 mp3 32k mono (压缩 ~15x)
+        # 根因: 实测当前网络环境 wav 上传速度仅 ~20KB/s, 5MB wav 需 250s 才能传完
+        #   → max-time 180s 都不够上传完整, returncode=28 timeout
+        #   → 压缩后 mp3 (~500KB-1MB) 30-65s 内可完整上传 + 处理
+        # 影响: Groq 原生支持 mp3 格式, 中文语音 32k mono 16kHz 准确度无可见损失
+        _upload_path = wav_path
+        try:
+            _wav_size = os.path.getsize(wav_path)
+        except OSError:
+            _wav_size = 0
+        if _wav_size > 1024 * 1024:  # > 1MB
+            _mp3_path = wav_path.replace('.wav', '.mp3')
+            try:
+                _rc = subprocess.run(
+                    ['ffmpeg', '-y', '-loglevel', 'error',
+                     '-i', wav_path,
+                     '-codec:a', 'libmp3lame', '-b:a', '32k',
+                     '-ar', '16000', '-ac', '1', _mp3_path],
+                    capture_output=True, timeout=60
+                )
+                if _rc.returncode == 0 and os.path.exists(_mp3_path):
+                    _mp3_size = os.path.getsize(_mp3_path)
+                    _ratio = _wav_size / max(_mp3_size, 1)
+                    print(f"  [groq] wav {_wav_size/1024/1024:.1f}MB -> mp3 "
+                          f"{_mp3_size/1024:.0f}KB (压缩 {_ratio:.0f}x)", flush=True)
+                    _upload_path = _mp3_path
+                else:
+                    print(f"  [groq] wav->mp3 失败 (rc={_rc.returncode}), 用原 wav", flush=True)
+            except subprocess.TimeoutExpired:
+                print(f"  [groq] wav->mp3 超时 60s, 用原 wav", flush=True)
+
+        _duration = _ffprobe_duration(_upload_path)
+
+        # ── A (2026-08-06): ASPH 软限检查 (6500s 阈值, raise 跳过本条) ──
+        if _duration > 0:
+            _asph_check_or_raise(_duration)
+
+        # ── B (2026-08-06): 时长 > 600s 自动 240s 切片, 避免单条吃爋 ASPH ──
+        if _duration > SLICE_THRESHOLD_SEC:
+            print(f"  [groq] 时长 {_duration:.0f}s > {SLICE_THRESHOLD_SEC}s, "
+                  f"预切片 {SLICE_LEN_SEC}s/段...", flush=True)
+            _slices = _slice_audio(_upload_path, slice_len_sec=SLICE_LEN_SEC)
+            print(f"  [groq] → {len(_slices)} 段", flush=True)
+        else:
+            _slices = [_upload_path]
+
+        print(f"  [groq] 转录中 ({groq_model})...", flush=True)
+        _groq_call_t0 = _t_groq.time()
+        if len(_slices) > 1:
+            _parts = []
+            for _i, _s in enumerate(_slices, 1):
+                print(f"  [groq] 段 {_i}/{len(_slices)} 转录中...", flush=True)
+                _part = transcribe_groq(_s, groq_key, model=groq_model)
+                if not _part:
+                    raise RuntimeError(
+                        f"Groq ASR 段 {_i} 返回空 (consecutive_429={_GROQ_CONSECUTIVE_429}, "
+                        f"cooldown_until={_GROQ_COOLDOWN_UNTIL:.0f}, disabled={_GROQ_DISABLED}) — "
+                        f"极简模式: 无 fallback, 请检查 Groq 服务状态"
+                    )
+                _parts.append(_part)
+            text = "\n".join(_parts)
+        else:
+            text = transcribe_groq(_slices[0], groq_key, model=groq_model)
+        _groq_call_elapsed = _t_groq.time() - _groq_call_t0
+        if not text:
+            raise RuntimeError(
+                f"Groq ASR 返回空 (consecutive_429={_GROQ_CONSECUTIVE_429}, "
+                f"cooldown_until={_GROQ_COOLDOWN_UNTIL:.0f}, disabled={_GROQ_DISABLED}) — "
+                f"极简模式: 无 fallback, 请检查 Groq 服务状态"
+            )
+
+        src_tag = "groq_429" if _GROQ_LAST_WAS_429 else "groq"
+        print(f"  [{src_tag}] 成功 {len(text)} chars ({_groq_call_elapsed:.1f}s)", flush=True)
+        return text, src_tag
+
+    finally:
+        if tmp_ctx and not keep_wav_on_fail:
+            tmp_ctx.cleanup()
+
+
+
+# ═══════════════════════════════════════════════════════
+# CLI
+# ═══════════════════════════════════════════════════════
+
+if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        print("usage: transcribe_local.py <audio_file_or_url>", file=sys.stderr)
+        sys.exit(1)
+    source = sys.argv[1]
+    headers = None
+    if len(sys.argv) > 2:
+        try:
+            headers = json.loads(sys.argv[2])
+        except Exception:
+            pass
+    # 极简模式 (2026-07-30): transcribe() 失败 raise RuntimeError, CLI 直接报 stderr + 退出 1
+    try:
+        text, source_tag = transcribe(source, headers=headers)
+    except RuntimeError as e:
+        print(f"TRANSCRIPT_FAIL_RUNTIME: {e}", file=sys.stderr)
+        sys.exit(2)
+    if text:
+        print(f"TRANSCRIPT_OK {source_tag} {len(text)}")
+        print(text[:500])
+    else:
+        # 理论上极简模式下不会到这里 (空返回必 raise), 兜底
+        print("TRANSCRIPT_FAIL_EMPTY (意料外, 极简模式下 transcribe() 失败必 raise)", file=sys.stderr)
+        sys.exit(1)
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 腾讯云 ASR（长音频异步转写，CreateRecTask，COS URL 上传）
+# 凭证: ~/.agents/credentials/ominicrawl/tencent-asr.json  (格式: {"secret_id","secret_key"})
+# COS Bucket: steven-crawl-audio-1307520401 (ap-guangzhou, 已创建 2026-07-30)
+# 免费额度: 100小时/月 (异步录音识别)
+# 上传方式: COS URL (无 5MB 限制，上传→ASR→清理)
+# 最大文件: 5MB (base64上传) / 无限制 (URL上传)
+# MP3 16kbps 压缩: 5MB ≈ 42分钟音频 → 覆盖绝大部分场景
+# 引擎: 16k_zh, Channel=1, ResTextFormat=2 (带标点)
+# ════════════════════════════════════════════════════════════════════════════════
+
+_TENCENT_CREDS: dict | None = None
+
+def _load_tencent_creds() -> dict:
+    """加载腾讯云 ASR 凭证"""
+    global _TENCENT_CREDS
+    if _TENCENT_CREDS is not None:
+        return _TENCENT_CREDS
+    import json
+    creds_file = Path.home() / ".agents" / "credentials" / "ominicrawl" / "tencent-asr.json"
+    if creds_file.exists():
+        try:
+            _TENCENT_CREDS = json.loads(creds_file.read_text())
+        except Exception:
+            _TENCENT_CREDS = {}
+    else:
+        _TENCENT_CREDS = {}
+    return _TENCENT_CREDS
+
+
+def transcribe_tencent_asr(wav_path: str, timeout: int = 300) -> str:
+    """
+    腾讯云 ASR 长音频异步转写 (CreateRecTask, COS URL 上传).
+
+    流程: WAV → COS → ASR (URL 拉取) → 转录文本 → COS 清理
+    凭证: ~/.agents/credentials/ominicrawl/tencent-asr.json
+    COS Bucket: steven-crawl-audio-1307520401 (ap-guangzhou)
+    免费额度: 100小时/月 | 无文件大小限制
+
+    Args:
+        wav_path: 本地 WAV 文件路径
+        timeout: 最大等待秒数 (默认 300s)
+
+    Returns:
+        转录文本，失败返回 ""
+    """
+    import time as _t, uuid as _uuid
+    creds = _load_tencent_creds()
+    secret_id = creds.get("secret_id") or creds.get("api_key")
+    secret_key = creds.get("secret_key")
+    if not secret_id or not secret_key:
+        print("  [tencent_asr] 凭证缺失 (tencent-asr.json)", flush=True)
+        return ""
+
+    COS_BUCKET = "steven-crawl-audio-1307520401"
+    COS_REGION = "ap-guangzhou"
+    cos_key = f"asr/{_uuid.uuid4().hex}.wav"
+
+    try:
+        # Step 1: 上传到 COS
+        from qcloud_cos import CosConfig, CosS3Client
+        cos_config = CosConfig(Region=COS_REGION, SecretId=secret_id, SecretKey=secret_key)
+        cos_client = CosS3Client(cos_config)
+
+        wav_size = os.path.getsize(wav_path)
+        with open(wav_path, "rb") as f:
+            cos_client.put_object(
+                Bucket=COS_BUCKET, Body=f, Key=cos_key,
+                ContentLength=str(wav_size),
+                ACL="public-read"  # ASR 需公有读
+            )
+        cos_url = f"https://{COS_BUCKET}.cos.{COS_REGION}.myqcloud.com/{cos_key}"
+        print(f"  [tencent_asr] COS 上传完成: {cos_key} ({wav_size/1024/1024:.1f}MB)", flush=True)
+
+        try:
+            # Step 2: 提交 ASR 任务 (SourceType=0: URL)
+            from tencentcloud.common.profile import client_profile
+            from tencentcloud.common import credential
+            from tencentcloud.asr.v20190614 import asr_client, models
+
+            cred = credential.Credential(secret_id, secret_key)
+            cp = client_profile.ClientProfile()
+            cp.httpProfile.endpoint = "asr.tencentcloudapi.com"
+            asr_cli = asr_client.AsrClient(cred, COS_REGION, cp)
+
+            req = models.CreateRecTaskRequest()
+            req.EngineModelType = "16k_zh"
+            req.ChannelNum = 1
+            req.ResTextFormat = 2
+            req.SourceType = 0   # 0 = URL (无 5MB 限制)
+            req.Url = cos_url
+
+            resp = asr_cli.CreateRecTask(req)
+            task_id = resp.Data.TaskId
+            print(f"  [tencent_asr] task_id={task_id}, 提交中...", flush=True)
+
+            # Step 3: 轮询
+            status_map = {0: "等待", 1: "处理中", 2: "完成", 3: "失败"}
+            deadline = _t.time() + timeout
+            poll = 0
+            while _t.time() < deadline:
+                _t.sleep(2)
+                poll += 1
+                s_req = models.DescribeTaskStatusRequest()
+                s_req._TaskId = task_id
+                s_resp = asr_cli.DescribeTaskStatus(s_req)
+                s_data = s_resp.Data
+                print(f"  [tencent_asr] poll #{poll} Status={status_map.get(s_data.Status, s_data.Status)}", flush=True)
+                if s_data.Status == 2:
+                    result = getattr(s_data, "Result", "") or ""
+                    print(f"  [tencent_asr] 成功 {len(result)} chars", flush=True)
+                    return result
+                elif s_data.Status == 3:
+                    print(f"  [tencent_asr] 失败: {getattr(s_data, 'ErrorMsg', 'unknown')}", flush=True)
+                    return ""
+
+            print(f"  [tencent_asr] 超时 ({timeout}s)", flush=True)
+            return ""
+
+        finally:
+            # Step 4: 清理 COS 对象
+            try:
+                cos_client.delete_object(COS_BUCKET, cos_key)
+                print(f"  [tencent_asr] COS 清理: {cos_key}", flush=True)
+            except Exception as e:
+                print(f"  [tencent_asr] COS 清理失败: {e} (可忽略)", flush=True)
+
+    except Exception as e:
+        print(f"  [tencent_asr] 异常: {e}", flush=True)
+        return ""
+
+
+# 注: transcribe_tencent_asr() 函数保留 (Bailian 真耗尽时手动 FORCE_TENCENT=1 调用),
+#     但默认链路 groq → bailian → mlx 不调它 (2026-07-30 修 #10)

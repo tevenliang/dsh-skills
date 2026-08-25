@@ -1,0 +1,4 @@
+interface:
+  display_name: "Crawl Report"
+  short_description: "ominicrawl 爬取耗时分析：按 supervisor 操作拆解 + 平台阶段耗时"
+  default_prompt: "生成 ominicrawl 爬取耗时分析报告：按 supervisor 实测的「各操作耗时统计」拆解，并叠加「各平台阶段耗时」和「总览」。"

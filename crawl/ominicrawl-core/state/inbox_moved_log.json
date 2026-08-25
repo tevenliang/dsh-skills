@@ -1,0 +1,1370 @@
+[
+  {
+    "node_token": "UEJgwhOoEi5hxKkYuMMcarW0ne2",
+    "title": "HERMES AGENT多智能体实战指南：Kanban功能深度解析与落地应用",
+    "category": "hermes",
+    "target": "人工智能AI / Hermes",
+    "target_token": "ClwSw404mistt8kTqS3cS15xnth",
+    "moved_at": "2026-07-15 16:20:26"
+  },
+  {
+    "node_token": "QglPwtMnmiiYV4kxRiacxUKqnDd",
+    "title": "Hermes Control Interface (HCI)：生产级Agent管理后台深度解析",
+    "category": "hermes",
+    "target": "人工智能AI / Hermes",
+    "target_token": "ClwSw404mistt8kTqS3cS15xnth",
+    "moved_at": "2026-07-15 16:20:28"
+  },
+  {
+    "node_token": "WeKewYq6jiySgfk4xH7cqwMtnBh",
+    "title": "Hermes AI Agent官方桌面版深度评测：安装体验与功能解析",
+    "category": "hermes",
+    "target": "人工智能AI / Hermes",
+    "target_token": "ClwSw404mistt8kTqS3cS15xnth",
+    "moved_at": "2026-07-15 16:20:29"
+  },
+  {
+    "node_token": "VRvmwSR0sibkA3kgjJRcIHDanKg",
+    "title": "notebooklm-py：非官方SDK如何引爆开源社区？解析大模型时代的 能力解锁",
+    "category": "llm",
+    "target": "人工智能AI / 大模型Llm",
+    "target_token": "JCRzw09qwiyt9Ukjks3c8L3rncc",
+    "moved_at": "2026-07-15 16:20:31"
+  },
+  {
+    "node_token": "Mvgdw4np7i3TM4kWiGxcUMHOn4d",
+    "title": "Agent时代内容格式之争：Markdown与HTML的场景化对比分析",
+    "category": "llm",
+    "target": "人工智能AI / 大模型Llm",
+    "target_token": "JCRzw09qwiyt9Ukjks3c8L3rncc",
+    "moved_at": "2026-07-15 16:20:33"
+  },
+  {
+    "node_token": "ArD1wpLn1ihLETkPwGnc93Rsndr",
+    "title": "Kimi Work Beta发布_国内通用Agent产品化元年开启",
+    "category": "llm",
+    "target": "人工智能AI / 大模型Llm",
+    "target_token": "JCRzw09qwiyt9Ukjks3c8L3rncc",
+    "moved_at": "2026-07-15 16:20:35"
+  },
+  {
+    "node_token": "CWfUwlFuFijGfPkmAZIcDJk5nBc",
+    "title": "Hermes Computer Use功能深度解析：跨模型桌面自动化的突破与实践",
+    "category": "hermes",
+    "target": "人工智能AI / Hermes",
+    "target_token": "ClwSw404mistt8kTqS3cS15xnth",
+    "moved_at": "2026-07-15 16:20:36"
+  },
+  {
+    "node_token": "H2dewzwiQiE0YXkrVqdcLFurneh",
+    "title": "有色横盘破局：资金流入近80亿，抢筹的真正逻辑，不只是超跌反",
+    "category": "stock",
+    "target": "投资理财Investment / 股市行情",
+    "target_token": "NtOlwsKMti8Hvtk0epGcHpZdnYl",
+    "moved_at": "2026-07-15 16:20:38"
+  },
+  {
+    "node_token": "UL30wjLTki7NgekJdLocZcwlnWe",
+    "title": "刚刚！汤道生姚顺雨对谈50分钟，回应腾讯AI慢之疑！讲透AI下半场",
+    "category": "stock",
+    "target": "投资理财Investment / 股市行情",
+    "target_token": "NtOlwsKMti8Hvtk0epGcHpZdnYl",
+    "moved_at": "2026-07-15 16:20:40"
+  },
+  {
+    "node_token": "ZR1hwxkqIii8eykofGFc8ceSnub",
+    "title": "拆解英伟达Rubin价值表，看懂谁吃肉谁喝汤",
+    "category": "stock",
+    "target": "投资理财Investment / 股市行情",
+    "target_token": "NtOlwsKMti8Hvtk0epGcHpZdnYl",
+    "moved_at": "2026-07-15 16:20:42"
+  },
+  {
+    "node_token": "I6cdwShTTi1BDvklbuZcWTwPnqe",
+    "title": "SpaceX收购Cursor深度解析：AI编程智能体的算力革命与生态野心",
+    "category": "codex",
+    "target": "人工智能AI / Codex",
+    "target_token": "TE0Bw8mB5iUPFkkgLCtcWQYwnsc",
+    "moved_at": "2026-07-15 16:20:44"
+  },
+  {
+    "node_token": "VPmswAWSsifQTJkwtBYcxRpOnUd",
+    "title": "Kimi Work Beta发布：国内通用Agent产品化元年开启",
+    "category": "llm",
+    "target": "人工智能AI / 大模型Llm",
+    "target_token": "JCRzw09qwiyt9Ukjks3c8L3rncc",
+    "moved_at": "2026-07-15 16:20:46"
+  },
+  {
+    "node_token": "BPeowUE1siil1Qkw3QKcJ0Dknwh",
+    "title": "美团LongCat Flash Thinking 2601模型深度解析：重思考模式与Agent能力突破",
+    "category": "llm",
+    "target": "人工智能AI / 大模型Llm",
+    "target_token": "JCRzw09qwiyt9Ukjks3c8L3rncc",
+    "moved_at": "2026-07-15 16:20:49"
+  },
+  {
+    "node_token": "X1ruwFfTiixCJUkL8DscZ4pZnif",
+    "title": "6.5 央行是5月从市场中“抽走了”1万亿吗？",
+    "category": "stock",
+    "target": "投资理财Investment / 股市行情",
+    "target_token": "NtOlwsKMti8Hvtk0epGcHpZdnYl",
+    "moved_at": "2026-07-15 16:20:51"
+  },
+  {
+    "node_token": "OMTTw3UEeirqhdkHzJ0cVoa7n2g",
+    "title": "Browser Harness：重新定义AI Agent边界的浏览器操作系统",
+    "category": "browser",
+    "target": "应用工具Apps / 浏览器",
+    "target_token": "IjeLwQ66ViIdhQkOc25cZpSFnzd",
+    "moved_at": "2026-07-15 16:20:52"
+  },
+  {
+    "node_token": "El9AwBrrdi2lzDkV4mbcrmS8nhc",
+    "title": "2026年超级个体AI分身构建指南：从效率工具到增长引擎",
+    "category": "llm",
+    "target": "人工智能AI / 大模型Llm",
+    "target_token": "JCRzw09qwiyt9Ukjks3c8L3rncc",
+    "moved_at": "2026-07-15 16:20:55"
+  },
+  {
+    "node_token": "RgVfwDAfBiABvxkyZXrcjneInM0",
+    "title": "符合国内用户使用习惯的赫姆斯前端Dashboard开源项目功能分享",
+    "category": "hermes",
+    "target": "人工智能AI / Hermes",
+    "target_token": "ClwSw404mistt8kTqS3cS15xnth",
+    "moved_at": "2026-07-15 16:20:58"
+  },
+  {
+    "node_token": "YiRewHdgEi8j38kxCB2cMzKqnfc",
+    "title": "Hermes AI助手满配指南：从\"残废版\"到专业级AI Agent的7步配置路线图",
+    "category": "hermes",
+    "target": "人工智能AI / Hermes",
+    "target_token": "ClwSw404mistt8kTqS3cS15xnth",
+    "moved_at": "2026-07-15 16:21:00"
+  },
+  {
+    "node_token": "Bsziwsldzioz3Xk2Y17cWyzanOk",
+    "title": "2026年AI Agent技术突破：GenericAgent（GA）的极简自进化范式研究",
+    "category": "llm",
+    "target": "人工智能AI / 大模型Llm",
+    "target_token": "JCRzw09qwiyt9Ukjks3c8L3rncc",
+    "moved_at": "2026-07-15 16:21:02"
+  },
+  {
+    "node_token": "ImmowgmzBiBFfmkeTUZc3vQWnPw",
+    "title": "Agent框架新势力：Hermes（爱马仕）崛起与实践部署指南",
+    "category": "hermes",
+    "target": "人工智能AI / Hermes",
+    "target_token": "ClwSw404mistt8kTqS3cS15xnth",
+    "moved_at": "2026-07-15 16:21:04"
+  },
+  {
+    "node_token": "H4ORwEWE6iwV1LkkTT3c6GzTn7g",
+    "title": "关于我user.md",
+    "category": "knowledge",
+    "target": "人工智能AI / 知识库",
+    "target_token": "L3bpw3Jsci4DRPkLJPHcY8ZunhE",
+    "moved_at": "2026-07-15 16:21:05"
+  },
+  {
+    "node_token": "MFpjw0Tysi9oZ3kcRTicpUaqnZb",
+    "title": "腾讯AI下半场战略深度解析：从模型到Agent的产业落地路径",
+    "category": "stock",
+    "target": "投资理财Investment / 股市行情",
+    "target_token": "NtOlwsKMti8Hvtk0epGcHpZdnYl",
+    "moved_at": "2026-07-15 16:21:07"
+  },
+  {
+    "node_token": "IPfCwyWKkiuzJskJ6MGcX0prnpe",
+    "title": "Hermes AI Agent 进阶配置入门：人格配置、副驾模型、联网与记忆系统完整教程",
+    "category": "hermes",
+    "target": "人工智能AI / Hermes",
+    "target_token": "ClwSw404mistt8kTqS3cS15xnth",
+    "moved_at": "2026-07-15 16:21:08"
+  },
+  {
+    "node_token": "DITBwpmELiCKEekB0O0cZBF9nzZ",
+    "title": "第一次用Obsidian？先把这8个插件装好再说",
+    "category": "skills",
+    "target": "人工智能AI / Skills",
+    "target_token": "D4CHwgs5hiEyhYk4DObcxQQXnIf",
+    "moved_at": "2026-07-15 16:21:10"
+  },
+  {
+    "node_token": "EZq0wH2UCiKx22kg7g8cR1m9nuI",
+    "title": "腾讯Marvis-操作系统层AI助手",
+    "category": "llm",
+    "target": "人工智能AI / 大模型Llm",
+    "target_token": "JCRzw09qwiyt9Ukjks3c8L3rncc",
+    "moved_at": "2026-07-15 16:21:11"
+  },
+  {
+    "node_token": "GbLnwuvjkiF7SekXeYGcNqLunPf",
+    "title": "OpenCLI：Agent时代的\"万能遥控器\"——重新定义软件交互边界",
+    "category": "llm",
+    "target": "人工智能AI / 大模型Llm",
+    "target_token": "JCRzw09qwiyt9Ukjks3c8L3rncc",
+    "moved_at": "2026-07-15 16:21:13"
+  },
+  {
+    "node_token": "BWxZwtRcoiwYBnkqiNvc3pSonqb",
+    "title": "Hermes Agent 安装后配置指南：从基础工作流到进阶工具的系统搭建",
+    "category": "hermes",
+    "target": "人工智能AI / Hermes",
+    "target_token": "ClwSw404mistt8kTqS3cS15xnth",
+    "moved_at": "2026-07-15 16:21:14"
+  },
+  {
+    "node_token": "PDEDwZXFXiPIUfkxYF6cuNeRnlg",
+    "title": "Claude Code (CC) 从入门到精通：AI Agent深度应用指南",
+    "category": "claude",
+    "target": "人工智能AI / Claude",
+    "target_token": "HOaUw4HGjiFAdSksslSc3Jyunuf",
+    "moved_at": "2026-07-15 16:21:16"
+  },
+  {
+    "node_token": "AwpswprZ1ihJHgkNoXTcOiunnue",
+    "title": "OpenColor \"龙虾\" AI助手深度使用指南：从入门到精通的九大核心技巧",
+    "category": "openclaw",
+    "target": "人工智能AI / Openclaw",
+    "target_token": "IjYNwliFKi7LoMkGBC5cb4SEnWf",
+    "moved_at": "2026-07-15 16:21:18"
+  },
+  {
+    "node_token": "D34swa68TiH4Zrk8XAkcCTLMnog",
+    "title": "AI Agent与大模型技术核心概念全景解析",
+    "category": "llm",
+    "target": "人工智能AI / 大模型Llm",
+    "target_token": "JCRzw09qwiyt9Ukjks3c8L3rncc",
+    "moved_at": "2026-07-15 16:21:19"
+  },
+  {
+    "node_token": "UWlmwFOzSiObijkZd3DcNQUQncY",
+    "title": "Hermes Agent效率提升指南：精选10个核心斜杠命令与实战工作流",
+    "category": "hermes",
+    "target": "人工智能AI / Hermes",
+    "target_token": "ClwSw404mistt8kTqS3cS15xnth",
+    "moved_at": "2026-07-15 16:21:21"
+  },
+  {
+    "node_token": "L9zuwicZti7xPQkUSYocseT5nXb",
+    "title": "Hermes 模型切换命令",
+    "category": "hermes",
+    "target": "人工智能AI / Hermes",
+    "target_token": "ClwSw404mistt8kTqS3cS15xnth",
+    "moved_at": "2026-07-15 16:21:22"
+  },
+  {
+    "node_token": "WvXOwxCpbias6OkTjRTcYtFxnqe",
+    "title": "SOUL.md：AI Agent的反幻觉行为宪章与可靠性框架",
+    "category": "hermes",
+    "target": "人工智能AI / Hermes",
+    "target_token": "ClwSw404mistt8kTqS3cS15xnth",
+    "moved_at": "2026-07-15 16:21:24"
+  },
+  {
+    "node_token": "Jw11w2uqOifL4OkzGa0cj0nAnxe",
+    "title": "Hermes生态进化：从CLI工具到AI工作台的7个关键开源项目解析",
+    "category": "hermes",
+    "target": "人工智能AI / Hermes",
+    "target_token": "ClwSw404mistt8kTqS3cS15xnth",
+    "moved_at": "2026-07-15 16:21:25"
+  },
+  {
+    "node_token": "TzWfww0jbiWOjXkvlZVceQROnvd",
+    "title": "6.5🐮基金大佬操作简报",
+    "category": "stock",
+    "target": "投资理财Investment / 股市行情",
+    "target_token": "NtOlwsKMti8Hvtk0epGcHpZdnYl",
+    "moved_at": "2026-07-15 16:21:28"
+  },
+  {
+    "node_token": "Ia2Xw6egfifcCdkqI00chQYGns9",
+    "title": "MiniMax MMX CLI工具深度评测与多模态内容创作全攻略",
+    "category": "llm",
+    "target": "人工智能AI / 大模型Llm",
+    "target_token": "JCRzw09qwiyt9Ukjks3c8L3rncc",
+    "moved_at": "2026-07-15 16:21:29"
+  },
+  {
+    "node_token": "LivdwnkXOiU6YKkYVZpcxDvLnUe",
+    "title": "微信AI Agent深度解析：从流量入口到意图入口的范式革命",
+    "category": "llm",
+    "target": "人工智能AI / 大模型Llm",
+    "target_token": "JCRzw09qwiyt9Ukjks3c8L3rncc",
+    "moved_at": "2026-07-15 16:21:31"
+  },
+  {
+    "node_token": "I1g4wz1wtiHjD6ksj0scLL17n0f",
+    "title": "AI原生笔记的范式革命：WPS笔记深度体验与行业洞察",
+    "category": "llm",
+    "target": "人工智能AI / 大模型Llm",
+    "target_token": "JCRzw09qwiyt9Ukjks3c8L3rncc",
+    "moved_at": "2026-07-15 16:21:33"
+  },
+  {
+    "node_token": "Iv6iwPJM0iZBCfkEsIncvBvHnzb",
+    "title": "2026年AI Agent产品演进：从单体智能到协作团队——MiniMax Mavis多Agent系统深度评测",
+    "category": "llm",
+    "target": "人工智能AI / 大模型Llm",
+    "target_token": "JCRzw09qwiyt9Ukjks3c8L3rncc",
+    "moved_at": "2026-07-15 16:21:34"
+  },
+  {
+    "node_token": "QYhIwjs4WioVnkkjtk4cMMeHn7e",
+    "title": "2026年AI Agent产品演进：从单体智能到协作团队——MiniMax Mavis多Agent系统深度评测",
+    "category": "llm",
+    "target": "人工智能AI / 大模型Llm",
+    "target_token": "JCRzw09qwiyt9Ukjks3c8L3rncc",
+    "moved_at": "2026-07-15 16:21:36"
+  },
+  {
+    "node_token": "GVx6wcexXiJO3okGrgdc9fWOnXb",
+    "title": "AI圈新范式：Loop Engineering（循环工程）深度解析",
+    "category": "llm",
+    "target": "人工智能AI / 大模型Llm",
+    "target_token": "JCRzw09qwiyt9Ukjks3c8L3rncc",
+    "moved_at": "2026-07-15 16:21:37"
+  },
+  {
+    "node_token": "BWFvwSfcqiPqDxkzXwZccPA3nLh",
+    "title": "百度搭子DuMate深度评测：国内Agent工具的效率革命与场景落地",
+    "category": "llm",
+    "target": "人工智能AI / 大模型Llm",
+    "target_token": "JCRzw09qwiyt9Ukjks3c8L3rncc",
+    "moved_at": "2026-07-15 16:21:39"
+  },
+  {
+    "node_token": "CEXJwJfbOiwhGckOgnBcrj2fneh",
+    "title": "WorkBuddy杀疯了？一群AI专家帮我打工，我在微信里当赛博虾工头",
+    "category": "workbuddy",
+    "target": "人工智能AI / Workbuddy",
+    "target_token": "NaVOwLXNciOQVKkSzORc4L5in9f",
+    "moved_at": "2026-07-15 16:21:40"
+  },
+  {
+    "node_token": "YnkNwJ5m8iQqNkk1PcZcNgVLnYb",
+    "title": "CC Switch 深度评测：Codex模型管理与多Agent协作的全功能枢纽",
+    "category": "codex",
+    "target": "人工智能AI / Codex",
+    "target_token": "TE0Bw8mB5iUPFkkgLCtcWQYwnsc",
+    "moved_at": "2026-07-15 16:21:42"
+  },
+  {
+    "node_token": "AqfLw5cDxiTChxk038Pc8RWKnzg",
+    "title": "🔧 Harness Engineering：AI Agent底层工作原理与工程范式解析",
+    "category": "llm",
+    "target": "人工智能AI / 大模型Llm",
+    "target_token": "JCRzw09qwiyt9Ukjks3c8L3rncc",
+    "moved_at": "2026-07-15 16:21:43"
+  },
+  {
+    "node_token": "Krsrwh45uiJn4fkgZXLcaUaQnsg",
+    "title": "Headroom：AI Agent的上下文压缩革命——从Token优化到智能体效率提升",
+    "category": "llm",
+    "target": "人工智能AI / 大模型Llm",
+    "target_token": "JCRzw09qwiyt9Ukjks3c8L3rncc",
+    "moved_at": "2026-07-15 16:21:45"
+  },
+  {
+    "node_token": "WKROwspnIiW4UdkLfwjcte3mnRd",
+    "title": "HERMES AI Agent分层记忆架构深度解析：从源码设计看落地AI记忆系统的工程思路",
+    "category": "hermes",
+    "target": "人工智能AI / Hermes",
+    "target_token": "ClwSw404mistt8kTqS3cS15xnth",
+    "moved_at": "2026-07-15 16:21:46"
+  },
+  {
+    "node_token": "EZdWwEJk8imEgjkX6rHcQERtnic",
+    "title": "Pi编码智能体深度分析：极简主义如何重塑AI辅助开发范式",
+    "category": "llm",
+    "target": "人工智能AI / 大模型Llm",
+    "target_token": "JCRzw09qwiyt9Ukjks3c8L3rncc",
+    "moved_at": "2026-07-15 16:21:48"
+  },
+  {
+    "node_token": "As5ZwN4NIiAC7vk4VPHcEMSjnrc",
+    "title": "6.2基金大佬操作汇总分享-按板块分类",
+    "category": "stock",
+    "target": "投资理财Investment / 股市行情",
+    "target_token": "NtOlwsKMti8Hvtk0epGcHpZdnYl",
+    "moved_at": "2026-07-15 16:21:50"
+  },
+  {
+    "node_token": "W6fhwcFKkiaWsAk77gTcdnyTnVg",
+    "title": "三天养基盈利1w左右的秘诀",
+    "category": "stock",
+    "target": "投资理财Investment / 股市行情",
+    "target_token": "NtOlwsKMti8Hvtk0epGcHpZdnYl",
+    "moved_at": "2026-07-15 16:21:51"
+  },
+  {
+    "node_token": "NKJhwD29QiLtRqk79WXcr9IMnfg",
+    "title": "Hermes Desktop：从命令行到图形界面的AI Agent体验升级",
+    "category": "hermes",
+    "target": "人工智能AI / Hermes",
+    "target_token": "ClwSw404mistt8kTqS3cS15xnth",
+    "moved_at": "2026-07-15 16:21:53"
+  },
+  {
+    "node_token": "PUGkwt0SYivCthkzOylcTdfOnxd",
+    "title": "亲身实操测评：AI智能体全媒体实训营，实操本月收入超5万的副业变现课",
+    "category": "llm",
+    "target": "人工智能AI / 大模型Llm",
+    "target_token": "JCRzw09qwiyt9Ukjks3c8L3rncc",
+    "moved_at": "2026-07-15 16:21:55"
+  },
+  {
+    "node_token": "QIniwowLsiTAeAkVaxgc63pDntg",
+    "title": "AI Agent技术选型深度分析：Hermes与OpenClaw的差异化竞争与市场格局重构",
+    "category": "hermes",
+    "target": "人工智能AI / Hermes",
+    "target_token": "ClwSw404mistt8kTqS3cS15xnth",
+    "moved_at": "2026-07-15 16:21:57"
+  },
+  {
+    "node_token": "A3VpwxoWoiErqEkfGJ3ca083njg",
+    "title": "Agent时代内容格式之争：Markdown与HTML的场景化对比分析",
+    "category": "llm",
+    "target": "人工智能AI / 大模型Llm",
+    "target_token": "JCRzw09qwiyt9Ukjks3c8L3rncc",
+    "moved_at": "2026-07-15 16:21:58"
+  },
+  {
+    "node_token": "BZblwmA7kiI6epkPrPjckvlRnjf",
+    "title": "Anthropic为什么呼吁暂停模型研发？",
+    "category": "claude",
+    "target": "人工智能AI / Claude",
+    "target_token": "HOaUw4HGjiFAdSksslSc3Jyunuf",
+    "moved_at": "2026-07-15 16:22:00"
+  },
+  {
+    "node_token": "LbEywvfXHiy5cgkVOwacoX2Unpd",
+    "title": "解锁Gemini侧边栏！Chrome原生AI功能太香了",
+    "category": "llm",
+    "target": "人工智能AI / 大模型Llm",
+    "target_token": "JCRzw09qwiyt9Ukjks3c8L3rncc",
+    "moved_at": "2026-07-15 16:22:02"
+  },
+  {
+    "node_token": "Q3xFwgQCYiMvpFku2WbcwJVandb",
+    "title": "GLM-5.0驱动的无限AI开发系统实践：从自动编码到端到端调试的全流程解析",
+    "category": "llm",
+    "target": "人工智能AI / 大模型Llm",
+    "target_token": "JCRzw09qwiyt9Ukjks3c8L3rncc",
+    "moved_at": "2026-07-15 16:22:04"
+  },
+  {
+    "node_token": "IzvswkAUrisWQbk6OEZc3KAfn6b",
+    "title": "Hermes Agent vs 小龙虾（OpenClaw）深度对比测评：智能助理的「品牌机」与「组装机」之争",
+    "category": "hermes",
+    "target": "人工智能AI / Hermes",
+    "target_token": "ClwSw404mistt8kTqS3cS15xnth",
+    "moved_at": "2026-07-15 16:22:05"
+  },
+  {
+    "node_token": "Q0r9wpz6ii33VQkkphYcuU69nxh",
+    "title": "我们最近买的 3 个「新玩意」",
+    "category": "stock",
+    "target": "投资理财Investment / 股市行情",
+    "target_token": "NtOlwsKMti8Hvtk0epGcHpZdnYl",
+    "moved_at": "2026-07-15 16:22:07"
+  },
+  {
+    "node_token": "RUP0w9lxMinILykyQGoc2HCWnfh",
+    "title": "下周是否变盘，关键看这4个信号",
+    "category": "stock",
+    "target": "投资理财Investment / 股市行情",
+    "target_token": "NtOlwsKMti8Hvtk0epGcHpZdnYl",
+    "moved_at": "2026-07-15 16:22:09"
+  },
+  {
+    "node_token": "KXcbw0phQiuQo1kW1J3cKs6tnyf",
+    "title": "RTK：AI编程智能体的终端降噪器与上下文优化解决方案",
+    "category": "llm",
+    "target": "人工智能AI / 大模型Llm",
+    "target_token": "JCRzw09qwiyt9Ukjks3c8L3rncc",
+    "moved_at": "2026-07-15 16:22:11"
+  },
+  {
+    "node_token": "OcVbweRueiBckfkxEMAc0NvunSg",
+    "title": "HERMES第三方开源网页面板hermes web ui功能实测与介绍",
+    "category": "hermes",
+    "target": "人工智能AI / Hermes",
+    "target_token": "ClwSw404mistt8kTqS3cS15xnth",
+    "moved_at": "2026-07-15 16:22:12"
+  },
+  {
+    "node_token": "YqNWwYBRIiSzrzkMT9TcNPRlnab",
+    "title": "Hermes Agent v0.14.0 Skill系统深度解析：从概念到实践",
+    "category": "hermes",
+    "target": "人工智能AI / Hermes",
+    "target_token": "ClwSw404mistt8kTqS3cS15xnth",
+    "moved_at": "2026-07-15 16:22:14"
+  },
+  {
+    "node_token": "FD65wG7xmiDnYUke465carYknzL",
+    "title": "2026，白酒继续深陷泥潭！",
+    "category": "stock",
+    "target": "投资理财Investment / 股市行情",
+    "target_token": "NtOlwsKMti8Hvtk0epGcHpZdnYl",
+    "moved_at": "2026-07-15 16:22:15"
+  },
+  {
+    "node_token": "Wsk6wlc2niHLMfkQTW4cMlJGn3c",
+    "title": "Claude Code (CC) 从入门到精通：AI Agent深度操作指南",
+    "category": "claude",
+    "target": "人工智能AI / Claude",
+    "target_token": "HOaUw4HGjiFAdSksslSc3Jyunuf",
+    "moved_at": "2026-07-15 16:22:17"
+  },
+  {
+    "node_token": "OmU5wfKmziqpJgkW9E3c0fnFnEh",
+    "title": "🦐 Hermes与Openclaw深度对比：AI Agent\"自我进化\"营销争议全解析",
+    "category": "hermes",
+    "target": "人工智能AI / Hermes",
+    "target_token": "ClwSw404mistt8kTqS3cS15xnth",
+    "moved_at": "2026-07-15 16:22:18"
+  },
+  {
+    "node_token": "VhZTwpRxZi6V3wkBCeKctO8nnad",
+    "title": "谁能懂我的笑点呀！笑颠了，哈哈哈",
+    "category": "uncategorized",
+    "target": "未分类Uncategory",
+    "target_token": "SiN3wqpcwiHP8Hk3bZhcoRp6n3Z",
+    "moved_at": "2026-07-15 16:22:20"
+  },
+  {
+    "node_token": "XHJSwXk0Ni3cZSkVYcNcdCXQngg",
+    "title": "错过了光模块，AI的下一个十倍赛道在哪？",
+    "category": "stock",
+    "target": "投资理财Investment / 股市行情",
+    "target_token": "NtOlwsKMti8Hvtk0epGcHpZdnYl",
+    "moved_at": "2026-07-15 16:22:22"
+  },
+  {
+    "node_token": "MsHvwVDGmiEFKmkEv2LcnIrpnff",
+    "title": "2026，白酒继续深陷泥潭！",
+    "category": "stock",
+    "target": "投资理财Investment / 股市行情",
+    "target_token": "NtOlwsKMti8Hvtk0epGcHpZdnYl",
+    "moved_at": "2026-07-15 16:22:24"
+  },
+  {
+    "node_token": "HNzAwY7rciCMAbkdriWcMlGbnBd",
+    "title": "2026年AI Agent产品演进：从单体智能到协作团队——MiniMax Mavis多Agent系统深度评测",
+    "category": "llm",
+    "target": "人工智能AI / 大模型Llm",
+    "target_token": "JCRzw09qwiyt9Ukjks3c8L3rncc",
+    "moved_at": "2026-07-15 16:22:26"
+  },
+  {
+    "node_token": "FNK5w6wxpiEVYrkv4Yqc4rBgnPe",
+    "title": "2026年AI Agent产品演进：从单体智能到协作团队——MiniMax Mavis多Agent系统深度评测",
+    "category": "llm",
+    "target": "人工智能AI / 大模型Llm",
+    "target_token": "JCRzw09qwiyt9Ukjks3c8L3rncc",
+    "moved_at": "2026-07-15 16:22:28"
+  },
+  {
+    "node_token": "AK1Hwv8HeiuLzxkwUszc0l4Onzd",
+    "title": "6.5 央行是5月从市场中“抽走了”1万亿吗？",
+    "category": "stock",
+    "target": "投资理财Investment / 股市行情",
+    "target_token": "NtOlwsKMti8Hvtk0epGcHpZdnYl",
+    "moved_at": "2026-07-15 16:22:30"
+  },
+  {
+    "node_token": "QVs2whthgioFk4k3IrYcdNrCnPT",
+    "title": "6.5🐮基金大佬操作简报",
+    "category": "stock",
+    "target": "投资理财Investment / 股市行情",
+    "target_token": "NtOlwsKMti8Hvtk0epGcHpZdnYl",
+    "moved_at": "2026-07-15 16:22:32"
+  },
+  {
+    "node_token": "CitewA3u5ihMf8kqMNJcS4Inncd",
+    "title": "AI Agent重大事故深度分析：Cursor+Claude Opus误删生产数据库事件全复盘",
+    "category": "claude",
+    "target": "人工智能AI / Claude",
+    "target_token": "HOaUw4HGjiFAdSksslSc3Jyunuf",
+    "moved_at": "2026-07-15 16:22:34"
+  },
+  {
+    "node_token": "WBDTwfKaYis5maky3dncqTrtngg",
+    "title": "AI编程工具新功能解析：Loop工程的真实价值与媒体误读",
+    "category": "llm",
+    "target": "人工智能AI / 大模型Llm",
+    "target_token": "JCRzw09qwiyt9Ukjks3c8L3rncc",
+    "moved_at": "2026-07-15 16:22:35"
+  },
+  {
+    "node_token": "Tbfgwg3mCiNuGckUM5lcQ2M5n9f",
+    "title": "Anthropic为什么呼吁暂停模型研发？",
+    "category": "claude",
+    "target": "人工智能AI / Claude",
+    "target_token": "HOaUw4HGjiFAdSksslSc3Jyunuf",
+    "moved_at": "2026-07-15 16:22:37"
+  },
+  {
+    "node_token": "Kw25whJUii9zUpk9Sc7cjax6nIf",
+    "title": "Anthropic交表，MiniMax冲A，而我最想聊的是M3大模型",
+    "category": "claude",
+    "target": "人工智能AI / Claude",
+    "target_token": "HOaUw4HGjiFAdSksslSc3Jyunuf",
+    "moved_at": "2026-07-15 16:22:39"
+  },
+  {
+    "node_token": "FLlYwNn7giOtTnkOfCGcEHNfnrg",
+    "title": "Claude Code (CC) 从入门到精通：AI Agent深度操作指南",
+    "category": "claude",
+    "target": "人工智能AI / Claude",
+    "target_token": "HOaUw4HGjiFAdSksslSc3Jyunuf",
+    "moved_at": "2026-07-15 16:22:40"
+  },
+  {
+    "node_token": "Bc7ZwcuHXiG89AkyBp2cr3dCnih",
+    "title": "Claude Code架构深度解析：AI编程Agent的技术原理与核心能力",
+    "category": "claude",
+    "target": "人工智能AI / Claude",
+    "target_token": "HOaUw4HGjiFAdSksslSc3Jyunuf",
+    "moved_at": "2026-07-15 16:22:42"
+  },
+  {
+    "node_token": "Zr0Awg1LtiF5LYken8scvka0nPb",
+    "title": "GLM-5.0驱动的无限AI开发系统实践：从自动编码到端到端调试的全流程解析",
+    "category": "llm",
+    "target": "人工智能AI / 大模型Llm",
+    "target_token": "JCRzw09qwiyt9Ukjks3c8L3rncc",
+    "moved_at": "2026-07-15 16:22:44"
+  },
+  {
+    "node_token": "XvPKw5HL8iIW4okGSAycpFf8nDh",
+    "title": "HERMES AI Agent分层记忆架构深度解析：从源码设计看落地AI记忆系统的工程思路",
+    "category": "hermes",
+    "target": "人工智能AI / Hermes",
+    "target_token": "ClwSw404mistt8kTqS3cS15xnth",
+    "moved_at": "2026-07-15 16:22:46"
+  },
+  {
+    "node_token": "FdGzwBUZsidV1RkPbabcZjOcn9c",
+    "title": "HERMES长期记忆工具Headset Docker部署全教程，解决AI遗忘问题",
+    "category": "hermes",
+    "target": "人工智能AI / Hermes",
+    "target_token": "ClwSw404mistt8kTqS3cS15xnth",
+    "moved_at": "2026-07-15 16:22:47"
+  },
+  {
+    "node_token": "MPPWwcT7kiQvG4k0LJfc6fWnnwR",
+    "title": "Hermes AI Agent 进阶配置入门：人格配置、副驾模型、联网与记忆系统完整教程",
+    "category": "hermes",
+    "target": "人工智能AI / Hermes",
+    "target_token": "ClwSw404mistt8kTqS3cS15xnth",
+    "moved_at": "2026-07-15 16:22:49"
+  },
+  {
+    "node_token": "GYFKw7huaivXvzkZpyJcqgkdnvg",
+    "title": "Hermes AI Agent进阶指南：记忆系统·技能进化·多Agent协作与生产化部署",
+    "category": "hermes",
+    "target": "人工智能AI / Hermes",
+    "target_token": "ClwSw404mistt8kTqS3cS15xnth",
+    "moved_at": "2026-07-15 16:22:52"
+  },
+  {
+    "node_token": "DbbpwAvIRi3eyXkYDRUchP5OnYe",
+    "title": "Hermes AI助手满配指南：从\"残废版\"到专业级AI Agent的7步配置路线图",
+    "category": "hermes",
+    "target": "人工智能AI / Hermes",
+    "target_token": "ClwSw404mistt8kTqS3cS15xnth",
+    "moved_at": "2026-07-15 16:22:55"
+  },
+  {
+    "node_token": "SpkGw26JziiAnqkrZpKctknbnv1",
+    "title": "Hermes Agent vs 小龙虾（OpenClaw）深度对比测评：智能助理的「品牌机」与「组装机」之争",
+    "category": "hermes",
+    "target": "人工智能AI / Hermes",
+    "target_token": "ClwSw404mistt8kTqS3cS15xnth",
+    "moved_at": "2026-07-15 16:22:56"
+  },
+  {
+    "node_token": "AvSiwSxSIiLOhHki3D3cEBskn9c",
+    "title": "Hermes Desktop：本地AI Agent的下一代进化与行业影响分析",
+    "category": "hermes",
+    "target": "人工智能AI / Hermes",
+    "target_token": "ClwSw404mistt8kTqS3cS15xnth",
+    "moved_at": "2026-07-15 16:22:58"
+  },
+  {
+    "node_token": "NvepwS2BtirHBxk64Q4cQCz2nfb",
+    "title": "OpenCLI：Agent时代的\"万能遥控器\"——重新定义软件交互边界",
+    "category": "llm",
+    "target": "人工智能AI / 大模型Llm",
+    "target_token": "JCRzw09qwiyt9Ukjks3c8L3rncc",
+    "moved_at": "2026-07-15 16:22:59"
+  },
+  {
+    "node_token": "PiRJweJyWiTSR4kYyj6cgWM5nNd",
+    "title": "OpenColor \"龙虾\" AI助手深度使用指南：从入门到精通的九大核心技巧",
+    "category": "openclaw",
+    "target": "人工智能AI / Openclaw",
+    "target_token": "IjYNwliFKi7LoMkGBC5cb4SEnWf",
+    "moved_at": "2026-07-15 16:23:01"
+  },
+  {
+    "node_token": "HXNowFeSMiNhuPkoMzmcVQYDnTe",
+    "title": "Token分销：解决全球AI资源错配的流动性基础设施",
+    "category": "llm",
+    "target": "人工智能AI / 大模型Llm",
+    "target_token": "JCRzw09qwiyt9Ukjks3c8L3rncc",
+    "moved_at": "2026-07-15 16:23:02"
+  },
+  {
+    "node_token": "LBLfwrgW0i0LU1ky4E9ckI2VnQc",
+    "title": "WorkBuddy 每日资讯：腾讯AI桌面智能体最新动态跟踪（2026-06-03）",
+    "category": "workbuddy",
+    "target": "人工智能AI / Workbuddy",
+    "target_token": "NaVOwLXNciOQVKkSzORc4L5in9f",
+    "moved_at": "2026-07-15 16:23:04"
+  },
+  {
+    "node_token": "LHDIwXpJxiCetPkEZJXcfW74nLs",
+    "title": "WorkBuddy杀疯了？一群AI专家帮我打工，我在微信里当赛博虾工头",
+    "category": "workbuddy",
+    "target": "人工智能AI / Workbuddy",
+    "target_token": "NaVOwLXNciOQVKkSzORc4L5in9f",
+    "moved_at": "2026-07-15 16:23:06"
+  },
+  {
+    "node_token": "EjsRw11fniREmBk9GRQc7KaTnWd",
+    "title": "notebooklm-py：非官方SDK如何引爆开源社区？解析大模型时代的\"能力解锁\"范式",
+    "category": "llm",
+    "target": "人工智能AI / 大模型Llm",
+    "target_token": "JCRzw09qwiyt9Ukjks3c8L3rncc",
+    "moved_at": "2026-07-15 16:23:08"
+  },
+  {
+    "node_token": "Q7jPwyRkAiIqAEkoRi7cgH2EnKf",
+    "title": "下周是否变盘，关键看这4个信号",
+    "category": "stock",
+    "target": "投资理财Investment / 股市行情",
+    "target_token": "NtOlwsKMti8Hvtk0epGcHpZdnYl",
+    "moved_at": "2026-07-15 16:23:10"
+  },
+  {
+    "node_token": "VLMTwtXR8iPHgQku6vAcchrzn7f",
+    "title": "亲身实操测评：AI智能体全媒体实训营，实操本月收入超5万的副业变现课",
+    "category": "llm",
+    "target": "人工智能AI / 大模型Llm",
+    "target_token": "JCRzw09qwiyt9Ukjks3c8L3rncc",
+    "moved_at": "2026-07-15 16:23:11"
+  },
+  {
+    "node_token": "RgRewF2PjiDMtOkWYcic4gJGnze",
+    "title": "从\"回答工具\"到\"协作伙伴\"：Tony Simons的Hermes Agent与SOUL.md设计哲学",
+    "category": "hermes",
+    "target": "人工智能AI / Hermes",
+    "target_token": "ClwSw404mistt8kTqS3cS15xnth",
+    "moved_at": "2026-07-15 16:23:13"
+  },
+  {
+    "node_token": "LEghwi9Viixd44kBw3XcXjcPnEd",
+    "title": "刚刚！汤道生姚顺雨对谈50分钟，回应腾讯AI慢之疑！讲透AI下半场",
+    "category": "stock",
+    "target": "投资理财Investment / 股市行情",
+    "target_token": "NtOlwsKMti8Hvtk0epGcHpZdnYl",
+    "moved_at": "2026-07-15 16:23:14"
+  },
+  {
+    "node_token": "RrnDwOKahiBAjDkGMy7cTOQVnGf",
+    "title": "带显示的AI眼镜：\"抬头即交互\"的未来感体验探索",
+    "category": "llm",
+    "target": "人工智能AI / 大模型Llm",
+    "target_token": "JCRzw09qwiyt9Ukjks3c8L3rncc",
+    "moved_at": "2026-07-15 16:23:16"
+  },
+  {
+    "node_token": "Z6vQw22Cci3OulkpqiqcN1Bgn9e",
+    "title": "拆解英伟达Rubin价值表，看懂谁吃肉谁喝汤",
+    "category": "stock",
+    "target": "投资理财Investment / 股市行情",
+    "target_token": "NtOlwsKMti8Hvtk0epGcHpZdnYl",
+    "moved_at": "2026-07-15 16:23:17"
+  },
+  {
+    "node_token": "GS40wRo1piNDBQktBS8c51yMnoh",
+    "title": "有色横盘破局：资金流入近80亿，抢筹的真正逻辑，不只是超跌反",
+    "category": "stock",
+    "target": "投资理财Investment / 股市行情",
+    "target_token": "NtOlwsKMti8Hvtk0epGcHpZdnYl",
+    "moved_at": "2026-07-15 16:23:19"
+  },
+  {
+    "node_token": "F1ybw1LXdijBQRkgBdPcUUGmnag",
+    "title": "相信魏哲家 年年买新家 相信魏哲家 年年买新家",
+    "category": "stock",
+    "target": "投资理财Investment / 股市行情",
+    "target_token": "NtOlwsKMti8Hvtk0epGcHpZdnYl",
+    "moved_at": "2026-07-15 16:23:21"
+  },
+  {
+    "node_token": "KiLqwVtavigvIhk7eaBcOSM9nUA",
+    "title": "第一次用Obsidian？先把这8个插件装好再说",
+    "category": "skills",
+    "target": "人工智能AI / Skills",
+    "target_token": "D4CHwgs5hiEyhYk4DObcxQQXnIf",
+    "moved_at": "2026-07-15 16:23:22"
+  },
+  {
+    "node_token": "Q2q8wErKfiv437kY2qIcTRLcnkd",
+    "title": "解锁Gemini侧边栏！Chrome原生AI功能太香了",
+    "category": "llm",
+    "target": "人工智能AI / 大模型Llm",
+    "target_token": "JCRzw09qwiyt9Ukjks3c8L3rncc",
+    "moved_at": "2026-07-15 16:23:24"
+  },
+  {
+    "node_token": "VHwDwPaaQiF662kN0OZcOweYnPf",
+    "title": "谁是最佳「嘴替」？搜狗/豆包/千问/Typeless世纪对决！",
+    "category": "llm",
+    "target": "人工智能AI / 大模型Llm",
+    "target_token": "JCRzw09qwiyt9Ukjks3c8L3rncc",
+    "moved_at": "2026-07-15 16:23:26"
+  },
+  {
+    "node_token": "Qv5ewDIrjiS4Yrk01MgcmEjPnrf",
+    "title": "谁能懂我的笑点呀！笑颠了，哈哈哈",
+    "category": "uncategorized",
+    "target": "未分类Uncategory",
+    "target_token": "SiN3wqpcwiHP8Hk3bZhcoRp6n3Z",
+    "moved_at": "2026-07-15 16:23:27"
+  },
+  {
+    "node_token": "HXyNwfMtuiQJR5kafZXcgkfjnud",
+    "title": "错过了光模块，AI的下一个十倍赛道在哪？",
+    "category": "stock",
+    "target": "投资理财Investment / 股市行情",
+    "target_token": "NtOlwsKMti8Hvtk0epGcHpZdnYl",
+    "moved_at": "2026-07-15 16:23:29"
+  },
+  {
+    "node_token": "QRrUwIqV0iC9tNk5swwcMdrGnTe",
+    "title": "黑色星期五！纳指创纪录暴跌1121点，AI大牛市遭当头棒喝",
+    "category": "stock",
+    "target": "投资理财Investment / 股市行情",
+    "target_token": "NtOlwsKMti8Hvtk0epGcHpZdnYl",
+    "moved_at": "2026-07-15 16:23:30"
+  },
+  {
+    "node_token": "LIsWwWtuFiV5nrkGXZycoFOsnic",
+    "title": "2026，白酒继续深陷泥潭！",
+    "category": "stock",
+    "target": "投资理财Investment / 股市行情",
+    "target_token": "NtOlwsKMti8Hvtk0epGcHpZdnYl",
+    "moved_at": "2026-07-15 16:23:32"
+  },
+  {
+    "node_token": "CrOOws3iLiO6VzkGiYNcTX9pn8b",
+    "title": "2026年AI Agent产品演进：从单体智能到协作团队——MiniMax Mavis多Agent系统深度评测",
+    "category": "llm",
+    "target": "人工智能AI / 大模型Llm",
+    "target_token": "JCRzw09qwiyt9Ukjks3c8L3rncc",
+    "moved_at": "2026-07-15 16:23:34"
+  },
+  {
+    "node_token": "YPT0wglfCi4fyHkIkh5cxqDzn5d",
+    "title": "2026年AI Agent产品演进：从单体智能到协作团队——MiniMax Mavis多Agent系统深度评测",
+    "category": "llm",
+    "target": "人工智能AI / 大模型Llm",
+    "target_token": "JCRzw09qwiyt9Ukjks3c8L3rncc",
+    "moved_at": "2026-07-15 16:23:35"
+  },
+  {
+    "node_token": "BW3iwKFKUiKXMbkd26Hc2zuPn5e",
+    "title": "6.5 央行是5月从市场中“抽走了”1万亿吗？",
+    "category": "stock",
+    "target": "投资理财Investment / 股市行情",
+    "target_token": "NtOlwsKMti8Hvtk0epGcHpZdnYl",
+    "moved_at": "2026-07-15 16:23:37"
+  },
+  {
+    "node_token": "BY7ww7k76iNYs6kIxZqcni2knrC",
+    "title": "6.5🐮基金大佬操作简报",
+    "category": "stock",
+    "target": "投资理财Investment / 股市行情",
+    "target_token": "NtOlwsKMti8Hvtk0epGcHpZdnYl",
+    "moved_at": "2026-07-15 16:23:38"
+  },
+  {
+    "node_token": "NGalwQFHpiqVO4k47rFco0vrnFf",
+    "title": "Anthropic为什么呼吁暂停模型研发？",
+    "category": "claude",
+    "target": "人工智能AI / Claude",
+    "target_token": "HOaUw4HGjiFAdSksslSc3Jyunuf",
+    "moved_at": "2026-07-15 16:23:40"
+  },
+  {
+    "node_token": "Wdv3wgoJ0iqGdoktrQxcRT4In2f",
+    "title": "Anthropic交表，MiniMax冲A，而我最想聊的是M3大模型",
+    "category": "claude",
+    "target": "人工智能AI / Claude",
+    "target_token": "HOaUw4HGjiFAdSksslSc3Jyunuf",
+    "moved_at": "2026-07-15 16:23:41"
+  },
+  {
+    "node_token": "WNn8wlDdtiE8q4k9v6VchtQ8nJf",
+    "title": "Claude Code (CC) 从入门到精通：AI Agent深度操作指南",
+    "category": "claude",
+    "target": "人工智能AI / Claude",
+    "target_token": "HOaUw4HGjiFAdSksslSc3Jyunuf",
+    "moved_at": "2026-07-15 16:23:43"
+  },
+  {
+    "node_token": "CzcWw06gUiA9I5k0rHScDHoRnVh",
+    "title": "GLM-5.0驱动的无限AI开发系统实践：从自动编码到端到端调试的全流程解析",
+    "category": "llm",
+    "target": "人工智能AI / 大模型Llm",
+    "target_token": "JCRzw09qwiyt9Ukjks3c8L3rncc",
+    "moved_at": "2026-07-15 16:23:45"
+  },
+  {
+    "node_token": "C1gCwzMH3iEAPokXghQcNY95ngb",
+    "title": "HERMES AI Agent分层记忆架构深度解析：从源码设计看落地AI记忆系统的工程思路",
+    "category": "hermes",
+    "target": "人工智能AI / Hermes",
+    "target_token": "ClwSw404mistt8kTqS3cS15xnth",
+    "moved_at": "2026-07-15 16:23:47"
+  },
+  {
+    "node_token": "NLW6wr4KqipkvjkbkzhcwBRxnfk",
+    "title": "Hermes AI Agent 进阶配置入门：人格配置、副驾模型、联网与记忆系统完整教程",
+    "category": "hermes",
+    "target": "人工智能AI / Hermes",
+    "target_token": "ClwSw404mistt8kTqS3cS15xnth",
+    "moved_at": "2026-07-15 16:23:49"
+  },
+  {
+    "node_token": "M4T6wA1R7ix1UNkhYTncfdPYnQb",
+    "title": "Hermes AI助手满配指南：从\"残废版\"到专业级AI Agent的7步配置路线图",
+    "category": "hermes",
+    "target": "人工智能AI / Hermes",
+    "target_token": "ClwSw404mistt8kTqS3cS15xnth",
+    "moved_at": "2026-07-15 16:23:50"
+  },
+  {
+    "node_token": "Fxx2wC1EKiQT8Mk0g6UcTLmgnnc",
+    "title": "Hermes Agent vs 小龙虾（OpenClaw）深度对比测评：智能助理的「品牌机」与「组装机」之争",
+    "category": "hermes",
+    "target": "人工智能AI / Hermes",
+    "target_token": "ClwSw404mistt8kTqS3cS15xnth",
+    "moved_at": "2026-07-15 16:23:51"
+  },
+  {
+    "node_token": "Gnp4wDo5iiwGfBkG1X2cAskinZg",
+    "title": "OpenCLI：Agent时代的\"万能遥控器\"——重新定义软件交互边界",
+    "category": "llm",
+    "target": "人工智能AI / 大模型Llm",
+    "target_token": "JCRzw09qwiyt9Ukjks3c8L3rncc",
+    "moved_at": "2026-07-15 16:23:53"
+  },
+  {
+    "node_token": "O4CPwWT30i7ATwkjmC1cZeVmnkf",
+    "title": "OpenClaw（小龙虾）智能体配置指南：从\"豆包平替\"到\"贾维斯级助理\"的进阶之路",
+    "category": "openclaw",
+    "target": "人工智能AI / Openclaw",
+    "target_token": "IjYNwliFKi7LoMkGBC5cb4SEnWf",
+    "moved_at": "2026-07-15 16:23:55"
+  },
+  {
+    "node_token": "EsLzw1Y4sifws4kopo3cPhI9n7f",
+    "title": "OpenColor \"龙虾\" AI助手深度使用指南：从入门到精通的九大核心技巧",
+    "category": "openclaw",
+    "target": "人工智能AI / Openclaw",
+    "target_token": "IjYNwliFKi7LoMkGBC5cb4SEnWf",
+    "moved_at": "2026-07-15 16:23:56"
+  },
+  {
+    "node_token": "MDSxwDLLbiFshHkIDrQcIIClnLe",
+    "title": "WorkBuddy杀疯了？一群AI专家帮我打工，我在微信里当赛博虾工头",
+    "category": "workbuddy",
+    "target": "人工智能AI / Workbuddy",
+    "target_token": "NaVOwLXNciOQVKkSzORc4L5in9f",
+    "moved_at": "2026-07-15 16:23:58"
+  },
+  {
+    "node_token": "Vs2Gwrox1ixvlEkhaIPcr7pgnPb",
+    "title": "notebooklm-py：非官方SDK如何引爆开源社区？解析大模型时代的\"能力解锁\"范式",
+    "category": "llm",
+    "target": "人工智能AI / 大模型Llm",
+    "target_token": "JCRzw09qwiyt9Ukjks3c8L3rncc",
+    "moved_at": "2026-07-15 16:23:59"
+  },
+  {
+    "node_token": "Jpaaw3bzsi0o7Ok2Q1ccZy6nngg",
+    "title": "下周是否变盘，关键看这4个信号",
+    "category": "stock",
+    "target": "投资理财Investment / 股市行情",
+    "target_token": "NtOlwsKMti8Hvtk0epGcHpZdnYl",
+    "moved_at": "2026-07-15 16:24:01"
+  },
+  {
+    "node_token": "PQ7Fw3FlfiYclDk1rzpcrVKWnVe",
+    "title": "亲身实操测评：AI智能体全媒体实训营，实操本月收入超5万的副业变现课",
+    "category": "llm",
+    "target": "人工智能AI / 大模型Llm",
+    "target_token": "JCRzw09qwiyt9Ukjks3c8L3rncc",
+    "moved_at": "2026-07-15 16:24:03"
+  },
+  {
+    "node_token": "UUy5wGVIoiyV6lkdbSIczL7fnLh",
+    "title": "从\"回答工具\"到\"协作伙伴\"：Tony Simons的Hermes Agent与SOUL.md设计哲学",
+    "category": "hermes",
+    "target": "人工智能AI / Hermes",
+    "target_token": "ClwSw404mistt8kTqS3cS15xnth",
+    "moved_at": "2026-07-15 16:24:04"
+  },
+  {
+    "node_token": "NdO1wv1Fbi1pIikCKgVcMhyCnaf",
+    "title": "刚刚！汤道生姚顺雨对谈50分钟，回应腾讯AI慢之疑！讲透AI下半场",
+    "category": "stock",
+    "target": "投资理财Investment / 股市行情",
+    "target_token": "NtOlwsKMti8Hvtk0epGcHpZdnYl",
+    "moved_at": "2026-07-15 16:24:06"
+  },
+  {
+    "node_token": "F9LkwkS0BijvZWkeYoec2wMTnfb",
+    "title": "带显示的AI眼镜：\"抬头即交互\"的未来感体验探索",
+    "category": "llm",
+    "target": "人工智能AI / 大模型Llm",
+    "target_token": "JCRzw09qwiyt9Ukjks3c8L3rncc",
+    "moved_at": "2026-07-15 16:24:07"
+  },
+  {
+    "node_token": "HprDwa4P8irNhxklVfIcBS3mnHh",
+    "title": "有色横盘破局：资金流入近80亿，抢筹的真正逻辑，不只是超跌反",
+    "category": "stock",
+    "target": "投资理财Investment / 股市行情",
+    "target_token": "NtOlwsKMti8Hvtk0epGcHpZdnYl",
+    "moved_at": "2026-07-15 16:24:09"
+  },
+  {
+    "node_token": "AMquwBQyCijXdNkpVRKcGwyhnnD",
+    "title": "第一次用Obsidian？先把这8个插件装好再说",
+    "category": "skills",
+    "target": "人工智能AI / Skills",
+    "target_token": "D4CHwgs5hiEyhYk4DObcxQQXnIf",
+    "moved_at": "2026-07-15 16:24:11"
+  },
+  {
+    "node_token": "QOJKw2RASiXp6xkmG78cVwWPnne",
+    "title": "解锁Gemini侧边栏！Chrome原生AI功能太香了",
+    "category": "llm",
+    "target": "人工智能AI / 大模型Llm",
+    "target_token": "JCRzw09qwiyt9Ukjks3c8L3rncc",
+    "moved_at": "2026-07-15 16:24:12"
+  },
+  {
+    "node_token": "LQdpwPROniT43CkQnnIcfyXPnAe",
+    "title": "谁是最佳「嘴替」？搜狗/豆包/千问/Typeless世纪对决！",
+    "category": "llm",
+    "target": "人工智能AI / 大模型Llm",
+    "target_token": "JCRzw09qwiyt9Ukjks3c8L3rncc",
+    "moved_at": "2026-07-15 16:24:14"
+  },
+  {
+    "node_token": "WjsBw86aviqjG4kHP7Pc4eTmnhg",
+    "title": "谁能懂我的笑点呀！笑颠了，哈哈哈",
+    "category": "uncategorized",
+    "target": "未分类Uncategory",
+    "target_token": "SiN3wqpcwiHP8Hk3bZhcoRp6n3Z",
+    "moved_at": "2026-07-15 16:24:15"
+  },
+  {
+    "node_token": "JMPIwJFRciyanmkMs3GcLif9nbe",
+    "title": "错过了光模块，AI的下一个十倍赛道在哪？",
+    "category": "stock",
+    "target": "投资理财Investment / 股市行情",
+    "target_token": "NtOlwsKMti8Hvtk0epGcHpZdnYl",
+    "moved_at": "2026-07-15 16:24:17"
+  },
+  {
+    "node_token": "EPcpwsS3WiiU2WkonSsc6jMUnJe",
+    "title": "黑色星期五！纳指创纪录暴跌1121点，AI大牛市遭当头棒喝",
+    "category": "stock",
+    "target": "投资理财Investment / 股市行情",
+    "target_token": "NtOlwsKMti8Hvtk0epGcHpZdnYl",
+    "moved_at": "2026-07-15 16:24:18"
+  },
+  {
+    "node_token": "FI4HwaZMliYXKakaRtLcrBwGnLh",
+    "title": "🦐 Hermes与Openclaw深度对比：AI Agent\"自我进化\"营销争议全解析",
+    "category": "hermes",
+    "target": "人工智能AI / Hermes",
+    "target_token": "ClwSw404mistt8kTqS3cS15xnth",
+    "moved_at": "2026-07-15 16:24:20"
+  },
+  {
+    "node_token": "GbeKw4H5gixKCmkJVFRcNH06nPe",
+    "title": "2026，白酒继续深陷泥潭！",
+    "category": "stock",
+    "target": "投资理财Investment / 股市行情",
+    "target_token": "NtOlwsKMti8Hvtk0epGcHpZdnYl",
+    "moved_at": "2026-07-15 16:24:22"
+  },
+  {
+    "node_token": "N3GYw6VHUitkCfk3CEKcEXlnnMe",
+    "title": "2026年AI Agent产品演进：从单体智能到协作团队——MiniMax Mavis多Agent系统深度评测",
+    "category": "llm",
+    "target": "人工智能AI / 大模型Llm",
+    "target_token": "JCRzw09qwiyt9Ukjks3c8L3rncc",
+    "moved_at": "2026-07-15 16:24:25"
+  },
+  {
+    "node_token": "HrGgwEHLciSjiVk8iHpcluNYnZf",
+    "title": "2026年AI Agent产品演进：从单体智能到协作团队——MiniMax Mavis多Agent系统深度评测",
+    "category": "llm",
+    "target": "人工智能AI / 大模型Llm",
+    "target_token": "JCRzw09qwiyt9Ukjks3c8L3rncc",
+    "moved_at": "2026-07-15 16:24:27"
+  },
+  {
+    "node_token": "LOj8w50SwidNTKkAAi6c35mMngd",
+    "title": "6.5 央行是5月从市场中“抽走了”1万亿吗？",
+    "category": "stock",
+    "target": "投资理财Investment / 股市行情",
+    "target_token": "NtOlwsKMti8Hvtk0epGcHpZdnYl",
+    "moved_at": "2026-07-15 16:24:28"
+  },
+  {
+    "node_token": "LTRFwXPFiiA1HRkb5IMcoknZnhu",
+    "title": "6.5🐮基金大佬操作简报",
+    "category": "stock",
+    "target": "投资理财Investment / 股市行情",
+    "target_token": "NtOlwsKMti8Hvtk0epGcHpZdnYl",
+    "moved_at": "2026-07-15 16:24:30"
+  },
+  {
+    "node_token": "Yakywyuu7ifo5ekOHAwcwME0ngc",
+    "title": "Anthropic为什么呼吁暂停模型研发？",
+    "category": "claude",
+    "target": "人工智能AI / Claude",
+    "target_token": "HOaUw4HGjiFAdSksslSc3Jyunuf",
+    "moved_at": "2026-07-15 16:24:32"
+  },
+  {
+    "node_token": "BCIsw0rZ3ifZkSkTvZIcwYminMc",
+    "title": "Anthropic交表，MiniMax冲A，而我最想聊的是M3大模型",
+    "category": "claude",
+    "target": "人工智能AI / Claude",
+    "target_token": "HOaUw4HGjiFAdSksslSc3Jyunuf",
+    "moved_at": "2026-07-15 16:24:33"
+  },
+  {
+    "node_token": "ZtaDwbMctibvDWkOflic05O9nGC",
+    "title": "Claude Code (CC) 从入门到精通：AI Agent深度操作指南",
+    "category": "claude",
+    "target": "人工智能AI / Claude",
+    "target_token": "HOaUw4HGjiFAdSksslSc3Jyunuf",
+    "moved_at": "2026-07-15 16:24:35"
+  },
+  {
+    "node_token": "VPmTwwMwIifd78kaRIMce8lTnef",
+    "title": "GLM-5.0驱动的无限AI开发系统实践：从自动编码到端到端调试的全流程解析",
+    "category": "llm",
+    "target": "人工智能AI / 大模型Llm",
+    "target_token": "JCRzw09qwiyt9Ukjks3c8L3rncc",
+    "moved_at": "2026-07-15 16:24:37"
+  },
+  {
+    "node_token": "GoiAwYyhOi020nkYXR5cKGUvnNe",
+    "title": "OpenCLI：Agent时代的\"万能遥控器\"——重新定义软件交互边界",
+    "category": "llm",
+    "target": "人工智能AI / 大模型Llm",
+    "target_token": "JCRzw09qwiyt9Ukjks3c8L3rncc",
+    "moved_at": "2026-07-15 16:24:38"
+  },
+  {
+    "node_token": "BDj0w9SIyiJUybkhL4scD5xhnnO",
+    "title": "OpenColor \"龙虾\" AI助手深度使用指南：从入门到精通的九大核心技巧",
+    "category": "openclaw",
+    "target": "人工智能AI / Openclaw",
+    "target_token": "IjYNwliFKi7LoMkGBC5cb4SEnWf",
+    "moved_at": "2026-07-15 16:24:40"
+  },
+  {
+    "node_token": "XmOlw3IWEins5nkKnjBcQPk2nag",
+    "title": "WorkBuddy杀疯了？一群AI专家帮我打工，我在微信里当赛博虾工头",
+    "category": "workbuddy",
+    "target": "人工智能AI / Workbuddy",
+    "target_token": "NaVOwLXNciOQVKkSzORc4L5in9f",
+    "moved_at": "2026-07-15 16:24:42"
+  },
+  {
+    "node_token": "RNj0wtg4ri9gO1kyHMQcUqOOned",
+    "title": "notebooklm-py：非官方SDK如何引爆开源社区？解析大模型时代的\"能力解锁\"范式",
+    "category": "llm",
+    "target": "人工智能AI / 大模型Llm",
+    "target_token": "JCRzw09qwiyt9Ukjks3c8L3rncc",
+    "moved_at": "2026-07-15 16:24:43"
+  },
+  {
+    "node_token": "Um8FwVAWii7o7DkrDNPcAZUpn6g",
+    "title": "下周是否变盘，关键看这4个信号",
+    "category": "stock",
+    "target": "投资理财Investment / 股市行情",
+    "target_token": "NtOlwsKMti8Hvtk0epGcHpZdnYl",
+    "moved_at": "2026-07-15 16:24:45"
+  },
+  {
+    "node_token": "JwxCwQ4a9icBSHkiKUUckTLQn4P",
+    "title": "亲身实操测评：AI智能体全媒体实训营，实操本月收入超5万的副业变现课",
+    "category": "llm",
+    "target": "人工智能AI / 大模型Llm",
+    "target_token": "JCRzw09qwiyt9Ukjks3c8L3rncc",
+    "moved_at": "2026-07-15 16:24:46"
+  },
+  {
+    "node_token": "Vp6bwnoZAiXjz9kVtcDc3ld6nue",
+    "title": "从\"回答工具\"到\"协作伙伴\"：Tony Simons的Hermes Agent与SOUL.md设计哲学",
+    "category": "hermes",
+    "target": "人工智能AI / Hermes",
+    "target_token": "ClwSw404mistt8kTqS3cS15xnth",
+    "moved_at": "2026-07-15 16:24:48"
+  },
+  {
+    "node_token": "FbATwKiYTi4wClkzRQrcpF0Qnkd",
+    "title": "刚刚！汤道生姚顺雨对谈50分钟，回应腾讯AI慢之疑！讲透AI下半场",
+    "category": "stock",
+    "target": "投资理财Investment / 股市行情",
+    "target_token": "NtOlwsKMti8Hvtk0epGcHpZdnYl",
+    "moved_at": "2026-07-15 16:24:50"
+  },
+  {
+    "node_token": "K0AcwePgAic2Jxk3Nnbc0OuKnhf",
+    "title": "带显示的AI眼镜：\"抬头即交互\"的未来感体验探索",
+    "category": "llm",
+    "target": "人工智能AI / 大模型Llm",
+    "target_token": "JCRzw09qwiyt9Ukjks3c8L3rncc",
+    "moved_at": "2026-07-15 16:24:51"
+  },
+  {
+    "node_token": "DSCDwcCoki86i3kJHvack8Q0nNd",
+    "title": "拆解英伟达Rubin价值表，看懂谁吃肉谁喝汤",
+    "category": "stock",
+    "target": "投资理财Investment / 股市行情",
+    "target_token": "NtOlwsKMti8Hvtk0epGcHpZdnYl",
+    "moved_at": "2026-07-15 16:24:53"
+  },
+  {
+    "node_token": "NJBzw5FLwiq4zLkKJJKcK3xbnzh",
+    "title": "有色横盘破局：资金流入近80亿，抢筹的真正逻辑，不只是超跌反",
+    "category": "stock",
+    "target": "投资理财Investment / 股市行情",
+    "target_token": "NtOlwsKMti8Hvtk0epGcHpZdnYl",
+    "moved_at": "2026-07-15 16:24:54"
+  },
+  {
+    "node_token": "JhLwwbm4ji2M7nk6xKPcijahn9m",
+    "title": "第一次用Obsidian？先把这8个插件装好再说",
+    "category": "skills",
+    "target": "人工智能AI / Skills",
+    "target_token": "D4CHwgs5hiEyhYk4DObcxQQXnIf",
+    "moved_at": "2026-07-15 16:24:56"
+  },
+  {
+    "node_token": "U6RJwqhYViA7fYkCP8Vcsj4rn0g",
+    "title": "解锁Gemini侧边栏！Chrome原生AI功能太香了",
+    "category": "llm",
+    "target": "人工智能AI / 大模型Llm",
+    "target_token": "JCRzw09qwiyt9Ukjks3c8L3rncc",
+    "moved_at": "2026-07-15 16:24:58"
+  },
+  {
+    "node_token": "KgdPwx31Viel4gktNRcc3VPhnKd",
+    "title": "谁是最佳「嘴替」？搜狗/豆包/千问/Typeless世纪对决！",
+    "category": "llm",
+    "target": "人工智能AI / 大模型Llm",
+    "target_token": "JCRzw09qwiyt9Ukjks3c8L3rncc",
+    "moved_at": "2026-07-15 16:24:59"
+  },
+  {
+    "node_token": "RfaCwZ2oIipAYPk6NRgc6gOUnWb",
+    "title": "谁能懂我的笑点呀！笑颠了，哈哈哈",
+    "category": "uncategorized",
+    "target": "未分类Uncategory",
+    "target_token": "SiN3wqpcwiHP8Hk3bZhcoRp6n3Z",
+    "moved_at": "2026-07-15 16:25:02"
+  },
+  {
+    "node_token": "HlN6wEX1uihpsqkr6Lcc5C8inQg",
+    "title": "错过了光模块，AI的下一个十倍赛道在哪？",
+    "category": "stock",
+    "target": "投资理财Investment / 股市行情",
+    "target_token": "NtOlwsKMti8Hvtk0epGcHpZdnYl",
+    "moved_at": "2026-07-15 16:25:03"
+  },
+  {
+    "node_token": "EuHawpTmWiJ5oCkf0gVcIRgcnOf",
+    "title": "黑色星期五！纳指创纪录暴跌1121点，AI大牛市遭当头棒喝",
+    "category": "stock",
+    "target": "投资理财Investment / 股市行情",
+    "target_token": "NtOlwsKMti8Hvtk0epGcHpZdnYl",
+    "moved_at": "2026-07-15 16:25:06"
+  },
+  {
+    "node_token": "BeK4wJvlYi0B5EkkIYiczgz6nxg",
+    "title": "🦐 Hermes与Openclaw深度对比：AI Agent\"自我进化\"营销争议全解析",
+    "category": "hermes",
+    "target": "人工智能AI / Hermes",
+    "target_token": "ClwSw404mistt8kTqS3cS15xnth",
+    "moved_at": "2026-07-15 16:25:07"
+  },
+  {
+    "node_token": "QuyuwjGMCiBYwyk5EusccxCknIe",
+    "title": "Anthropic交表，MiniMax冲A，而我最想聊的是M3大模型",
+    "category": "claude",
+    "target": "人工智能AI / Claude",
+    "target_token": "HOaUw4HGjiFAdSksslSc3Jyunuf",
+    "moved_at": "2026-07-15 16:25:09"
+  },
+  {
+    "node_token": "YDTnwwgTBicim1kdO7ycbYujngB",
+    "title": "notebooklm-py：非官方SDK如何引爆开源社区？解析大模型时代的\"能力解锁\"范式",
+    "category": "llm",
+    "target": "人工智能AI / 大模型Llm",
+    "target_token": "JCRzw09qwiyt9Ukjks3c8L3rncc",
+    "moved_at": "2026-07-15 16:25:10"
+  },
+  {
+    "node_token": "D3yIwi8iPipNSykiIAkc9XLjnSr",
+    "title": "从\"回答工具\"到\"协作伙伴\"：Tony Simons的Hermes Agent与SOUL.md设计哲学",
+    "category": "hermes",
+    "target": "人工智能AI / Hermes",
+    "target_token": "ClwSw404mistt8kTqS3cS15xnth",
+    "moved_at": "2026-07-15 16:25:12"
+  },
+  {
+    "node_token": "GzmDwgMs6ifaZLk6wH0cBqyInSh",
+    "title": "谁是最佳「嘴替」？搜狗/豆包/千问/Typeless世纪对决！",
+    "category": "llm",
+    "target": "人工智能AI / 大模型Llm",
+    "target_token": "JCRzw09qwiyt9Ukjks3c8L3rncc",
+    "moved_at": "2026-07-15 16:25:13"
+  },
+  {
+    "node_token": "JSQgw6ogsi5TswkTDSIcPlLWnud",
+    "title": "微信公众号·腾讯WorkBuddy·全国首个！WorkBuddy OPC合作社区落地成都",
+    "category": "workbuddy",
+    "target": "人工智能AI / Workbuddy",
+    "target_token": "NaVOwLXNciOQVKkSzORc4L5in9f",
+    "moved_at": "2026-07-15 16:25:15"
+  },
+  {
+    "node_token": "IvYywjTqci4CK7k6Rrjc78hNn3g",
+    "title": "微信公众号·APPSO·一夜之间，GPT-5.6 来了，Codex 没了，Claude 急了",
+    "category": "claude",
+    "target": "人工智能AI / Claude",
+    "target_token": "HOaUw4HGjiFAdSksslSc3Jyunuf",
+    "moved_at": "2026-07-15 16:25:17"
+  }
+]

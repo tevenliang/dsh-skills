@@ -1,0 +1,7 @@
+interface:
+  display_name: "OpenRouter 热门模型路由"
+  short_description: "动态发现、比较、审计并安全调用当前热门 AI 模型"
+  icon_small: "./assets/logo-128.png"
+  icon_large: "./assets/logo.svg"
+  brand_color: "#6D28D9"
+  default_prompt: "Use $openrouter-hot-model-router to recommend and call the best current model for my task."

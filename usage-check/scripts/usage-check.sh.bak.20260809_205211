@@ -1,0 +1,186 @@
+#!/bin/bash
+# usage-check 统一入口
+# 用法:
+#   bash usage-check.sh                  # 人类可读汇总（默认 = all）
+#   bash usage-check.sh all              # 同上
+#   bash usage-check.sh json             # 合并 JSON 输出
+#   bash usage-check.sh minimax          # 单模块：人类可读
+#   bash usage-check.sh minimax json     # 单模块：原始 JSON
+#   bash usage-check.sh tavily           # 同上
+#   bash usage-check.sh deepseek         # 同上
+#
+# 默认会发 macOS notification（每个模块各一条）
+#   NO_NOTIF=1 bash usage-check.sh all   # 关闭通知
+#   SHOW_DEEPSEEK=1 bash usage-check.sh all  # 启用 DeepSeek
+
+set -u
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# ---- 参数解析 ----
+MODULE="${1:-all}"
+MODE="${2:-human}"  # human | json
+
+VALID_MODULES=("minimax" "tavily" "deepseek" "all")
+
+if [[ ! " ${VALID_MODULES[*]} " =~ " ${MODULE} " ]]; then
+    echo "❌ 未知模块: $MODULE"
+    echo "可选: ${VALID_MODULES[*]}"
+    exit 2
+fi
+
+if [[ "$MODE" != "human" && "$MODE" != "json" ]]; then
+    echo "❌ 未知模式: $MODE"
+    echo "可选: human | json"
+    exit 2
+fi
+
+# ---- 通知控制 ----
+NO_NOTIF="${NO_NOTIF:-0}"
+
+# ---- 单模块运行器 ----
+# 用法: run_module <minimax|tavily|deepseek> [send_notif]
+run_module() {
+    local mod=$1
+    local send_notif="${2:-0}"
+    local script=""
+
+    case $mod in
+        minimax)  script="$SCRIPT_DIR/minimax-check.sh" ;;
+        tavily)   script="$SCRIPT_DIR/tavily-check.sh" ;;
+        deepseek) script="$SCRIPT_DIR/deepseek-check.sh" ;;
+        *)
+            echo "{\"error\": \"unknown module: $mod\"}"
+            return 1
+            ;;
+    esac
+
+    if [[ "$send_notif" == "1" && "$mod" == "minimax" ]]; then
+        SEND_NOTIF=1 bash "$script"
+    elif [[ "$send_notif" == "1" && "$mod" == "deepseek" ]]; then
+        SHOW_DEEPSEEK="${SHOW_DEEPSEEK:-1}" SEND_NOTIF="${SEND_NOTIF:-1}" bash "$script"
+    else
+        SEND_NOTIF=0 bash "$script"
+    fi
+}
+
+# ---- 人类格式化：MiniMax ----
+fmt_minimax_human() {
+    local data="$1"
+    local fetched="$2"
+    python3 -c "
+import json, sys
+data = json.loads('''$data''')
+print('=== MiniMax 用量 ===')
+if 'error' in data:
+    print(f\"⚠️  {data['error']}\")
+    sys.exit(0)
+for m in data.get('models', []):
+    print(f\"【{m['model']}】\")
+    w5 = m['5h_window']
+    print(f\"  ⏰ 5h窗口: {w5['start_time']} ~ {w5['end_time']} ({w5['status_text']}) | 剩余 {w5['remaining_time']}\")
+    print(f\"  📊 5h用量: {w5['used_percent']}% 已用 | {w5['remaining_percent']}% 剩 | {w5['health_emoji']} {w5['health']}\")
+    ww = m['weekly_window']
+    boost = f\" | +{ww['boost_percent']}%\" if ww['boost_percent'] else ''
+    print(f\"  📅 本周窗口: {ww['start_time']} ~ {ww['end_time']} ({ww['status_text']}) | 剩余 {ww['remaining_time']}{boost}\")
+    print(f\"  📈 本周用量: {ww['used_percent']}% 已用 | {ww['remaining_percent']}% 剩 | {ww['health_emoji']} {ww['health']}\")
+print(f\"  ⏱️ 抓取时间: {data.get('fetched_at', '?')}\")
+"
+}
+
+# ---- 人类格式化：Tavily ----
+fmt_tavily_human() {
+    local data="$1"
+    python3 -c "
+import json
+data = json.loads('''$data''')
+print('=== Tavily 用量 ===')
+if 'error' in data:
+    print(f\"⚠️  {data['error']}\")
+    import sys; sys.exit(0)
+print(f\"📡 Tavily [{data['plan']}]\")
+print(f\"   已用: {data['used']} / {data['limit']} ({data['used_percent']}%)\")
+print(f\"   剩余: {data['remaining']} credits\")
+print(f\"   搜索消耗: {data['search_usage']} credits\")
+print(f\"   健康度: {data['health_emoji']} {data['health']}\")
+print(f\"   ⏱️ 抓取时间: {data.get('fetched_at', '?')}\")
+"
+}
+
+# ---- 人类格式化：DeepSeek ----
+fmt_deepseek_human() {
+    local data="$1"
+    python3 -c "
+import json
+data = json.loads('''$data''')
+print('=== DeepSeek 余额 ===')
+if data.get('disabled'):
+    print(f\"⚪ 已禁用: {data['reason']}\")
+    print(f\"   启用: {data.get('enable_command', 'SHOW_DEEPSEEK=1')}\")
+    import sys; sys.exit(0)
+if 'error' in data:
+    print(f\"⚠️  {data['error']}\")
+    import sys; sys.exit(0)
+print(f\"🤖 DeepSeek [{data['currency']}] {data['status_emoji']} {data['status_text']}\")
+print(f\"   {data['health_emoji']} 总余额: ¥{data['total_balance']}\")
+print(f\"   🎁 赠金: ¥{data['granted_balance']}\")
+print(f\"   💵 现金: ¥{data['topped_up_balance']}\")
+print(f\"   ⏱️ 抓取时间: {data.get('fetched_at', '?')}\")
+"
+}
+
+# ---- 主逻辑 ----
+if [[ "$MODULE" == "all" ]]; then
+    if [[ "$MODE" == "json" ]]; then
+        # 合并 JSON：用 python 合并三个输出
+        MINI=$(run_module minimax 0)
+        TAVI=$(run_module tavily 0)
+        DEEP=$(run_module deepseek 0)
+        python3 -c "
+import json
+mini = json.loads('''$MINI''')
+tavi = json.loads('''$TAVI''')
+deep = json.loads('''$DEEP''')
+print(json.dumps({
+    'minimax': mini,
+    'tavily': tavi,
+    'deepseek': deep
+}, ensure_ascii=False, indent=2))
+"
+    else
+        # 人类可读：顺序输出
+        if [[ "$NO_NOTIF" == "0" ]]; then
+            NOTIF=1
+        else
+            NOTIF=0
+        fi
+
+        MINI=$(run_module minimax $NOTIF)
+        TAVI=$(run_module tavily 0)
+        DEEP=$(run_module deepseek 0)
+
+        FETCHED=$(echo "$MINI" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('fetched_at',''))" 2>/dev/null || echo "")
+        fmt_minimax_human "$MINI" "$FETCHED"
+        echo ""
+        fmt_tavily_human "$TAVI"
+        echo ""
+        fmt_deepseek_human "$DEEP"
+    fi
+else
+    # 单模块
+    if [[ "$NO_NOTIF" == "0" ]]; then
+        NOTIF=1
+    else
+        NOTIF=0
+    fi
+    DATA=$(run_module $MODULE $NOTIF)
+
+    if [[ "$MODE" == "json" ]]; then
+        echo "$DATA"
+    else
+        case $MODULE in
+            minimax)  fmt_minimax_human "$DATA" "" ;;
+            tavily)   fmt_tavily_human "$DATA" ;;
+            deepseek) fmt_deepseek_human "$DATA" ;;
+        esac
+    fi
+fi

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Vault 批量蒸馏"
+  short_description: "批量蒸馏 vault 二级目录为带双向链接的 llmwiki 研究笔记"
+  default_prompt: "帮我把 steven_vault 里某个一级目录下的所有二级目录批量蒸馏成研究笔记，输出到 llmwiki"

@@ -1,0 +1,201 @@
+{
+  "checked_at": "26-08-25T19:44:28",
+  "threshold": 0.1,
+  "models": {
+    "qwen3.7-max": {
+      "model": "qwen3.7-max",
+      "remaining": 0,
+      "total": 0,
+      "pct": 0.0,
+      "available": false,
+      "ok": false,
+      "error": "BailianGateway.Team.NotAuthorised"
+    },
+    "qwen3.5-flash": {
+      "model": "qwen3.5-flash",
+      "remaining": 0,
+      "total": 0,
+      "pct": 0.0,
+      "available": false,
+      "ok": false,
+      "error": "BailianGateway.Team.NotAuthorised"
+    },
+    "qwen3.5-plus": {
+      "model": "qwen3.5-plus",
+      "remaining": 0,
+      "total": 0,
+      "pct": 0.0,
+      "available": false,
+      "ok": false,
+      "error": "BailianGateway.Team.NotAuthorised"
+    },
+    "qwen3.5-flash-2026-02-23": {
+      "model": "qwen3.5-flash-2026-02-23",
+      "remaining": 0,
+      "total": 0,
+      "pct": 0.0,
+      "available": false,
+      "ok": false,
+      "error": "BailianGateway.Team.NotAuthorised"
+    },
+    "qwen3.6-flash": {
+      "model": "qwen3.6-flash",
+      "remaining": 0,
+      "total": 0,
+      "pct": 0.0,
+      "available": false,
+      "ok": false,
+      "error": "BailianGateway.Team.NotAuthorised"
+    },
+    "qwen3.6-plus": {
+      "model": "qwen3.6-plus",
+      "remaining": 0,
+      "total": 0,
+      "pct": 0.0,
+      "available": false,
+      "ok": false,
+      "error": "BailianGateway.Team.NotAuthorised"
+    },
+    "qwen-plus-latest": {
+      "model": "qwen-plus-latest",
+      "remaining": 0,
+      "total": 0,
+      "pct": 0.0,
+      "available": false,
+      "ok": false,
+      "error": "BailianGateway.Team.NotAuthorised"
+    },
+    "deepseek-v3": {
+      "model": "deepseek-v3",
+      "remaining": 0,
+      "total": 0,
+      "pct": 0.0,
+      "available": false,
+      "ok": false,
+      "error": "BailianGateway.Team.NotAuthorised"
+    },
+    "deepseek-v4-pro": {
+      "model": "deepseek-v4-pro",
+      "remaining": 0,
+      "total": 0,
+      "pct": 0.0,
+      "available": false,
+      "ok": false,
+      "error": "BailianGateway.Team.NotAuthorised"
+    }
+  },
+  "asr_models": {
+    "fun-asr-flash-2026-06-15": {
+      "model": "fun-asr-flash-2026-06-15",
+      "available": false,
+      "ok": false,
+      "asr_status": "WAV_MISSING",
+      "task_status": null,
+      "asr_msg": "",
+      "asr_http": null,
+      "error": "WAV_MISSING"
+    },
+    "fun-asr-flash-8k-realtime": {
+      "model": "fun-asr-flash-8k-realtime",
+      "available": false,
+      "ok": false,
+      "asr_status": "WAV_MISSING",
+      "task_status": null,
+      "asr_msg": "",
+      "asr_http": null,
+      "error": "WAV_MISSING"
+    },
+    "fun-asr-flash-8k-realtime-2026-01-28": {
+      "model": "fun-asr-flash-8k-realtime-2026-01-28",
+      "available": false,
+      "ok": false,
+      "asr_status": "WAV_MISSING",
+      "task_status": null,
+      "asr_msg": "",
+      "asr_http": null,
+      "error": "WAV_MISSING"
+    },
+    "fun-asr-realtime": {
+      "model": "fun-asr-realtime",
+      "available": false,
+      "ok": false,
+      "asr_status": "WAV_MISSING",
+      "task_status": null,
+      "asr_msg": "",
+      "asr_http": null,
+      "error": "WAV_MISSING"
+    },
+    "fun-asr-realtime-2025-09-15": {
+      "model": "fun-asr-realtime-2025-09-15",
+      "available": false,
+      "ok": false,
+      "asr_status": "WAV_MISSING",
+      "task_status": null,
+      "asr_msg": "",
+      "asr_http": null,
+      "error": "WAV_MISSING"
+    },
+    "fun-asr-realtime-2025-11-07": {
+      "model": "fun-asr-realtime-2025-11-07",
+      "available": false,
+      "ok": false,
+      "asr_status": "WAV_MISSING",
+      "task_status": null,
+      "asr_msg": "",
+      "asr_http": null,
+      "error": "WAV_MISSING"
+    },
+    "fun-asr-realtime-2026-02-28": {
+      "model": "fun-asr-realtime-2026-02-28",
+      "available": false,
+      "ok": false,
+      "asr_status": "WAV_MISSING",
+      "task_status": null,
+      "asr_msg": "",
+      "asr_http": null,
+      "error": "WAV_MISSING"
+    },
+    "fun-asr-2025-08-25": {
+      "model": "fun-asr-2025-08-25",
+      "available": false,
+      "ok": false,
+      "asr_status": "WAV_MISSING",
+      "task_status": null,
+      "asr_msg": "",
+      "asr_http": null,
+      "error": "WAV_MISSING"
+    },
+    "fun-asr-mtl": {
+      "model": "fun-asr-mtl",
+      "available": false,
+      "ok": false,
+      "asr_status": "WAV_MISSING",
+      "task_status": null,
+      "asr_msg": "",
+      "asr_http": null,
+      "error": "WAV_MISSING"
+    },
+    "fun-asr-mtl-2025-08-25": {
+      "model": "fun-asr-mtl-2025-08-25",
+      "available": false,
+      "ok": false,
+      "asr_status": "WAV_MISSING",
+      "task_status": null,
+      "asr_msg": "",
+      "asr_http": null,
+      "error": "WAV_MISSING"
+    },
+    "fun-asr-2025-11-07": {
+      "model": "fun-asr-2025-11-07",
+      "available": false,
+      "ok": false,
+      "asr_status": "WAV_MISSING",
+      "task_status": null,
+      "asr_msg": "",
+      "asr_http": null,
+      "error": "WAV_MISSING"
+    }
+  },
+  "best_model": null,
+  "text_rate_limits": {}
+}

@@ -1,0 +1,21 @@
+{
+  "groq": {
+    "status": "active"
+  },
+  "bailian": {
+    "status": "active",
+    "model": "paraformer-mtl-v1"
+  },
+  "mlx": {
+    "status": "active",
+    "timeout_sec": 300
+  },
+  "glm_summary": {
+    "status": "active",
+    "backoff_until": null
+  },
+  "opencli": {
+    "status": "deprecated"
+  },
+  "last_recovery": "2026-08-25T19:44:29+08:00"
+}

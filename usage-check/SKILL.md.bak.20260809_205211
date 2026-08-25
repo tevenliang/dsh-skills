@@ -1,0 +1,296 @@
+---
+name: usage-check
+description: API 用量查询（JSON 结构化输出）— MiniMax Coding Plan（5h窗口+周统计双健康检查）、Tavily API 额度、DeepSeek 余额（默认禁用）。触发词：「用量查询」「查用量」「API 用量」「查配额」「DeepSeek 余额」
+version: "3.0.0"
+---
+
+# 用量查询 Skill
+
+Three independent read-only API quota checks, all outputting **structured JSON**. A unified entrypoint `usage-check.sh` aggregates results and offers both human-readable and raw JSON output.
+
+## Overview
+
+三个第三方 API 配额的只读查询工具，统一通过 `usage-check.sh` 入口调用:
+
+| 模块 | 状态 | 数据源 |
+|------|------|--------|
+| **MiniMax Coding Plan** | ✅ 启用 | `https://www.minimaxi.com/v1/api/openplatform/coding_plan/remains` |
+| **Tavily API** | ✅ 启用 | `https://api.tavily.com/usage` |
+| **DeepSeek** | ⏸ 默认禁用 | `https://api.deepseek.com/user/balance` |
+
+**所有模块输出 JSON**（不再是纯文本）。脚本同时支持人类可读格式（终端友好）和原始 JSON（机器可解析）。
+
+触发词：「用量查询」「查用量」「API 用量」「查配额」「MiniMax 用量」「Tavily 用量」「DeepSeek 余额」「查余额」
+
+## When to Use
+
+- 用户问"我的 MiniMax 还能用多久"
+- cron 巡检前先看配额（脚本本身不发通知外的副作用，由调用方控制）
+- 排除 API 限速/余额不足问题
+- 需要结构化数据时（cron / 日志 / 二次处理）
+
+## 架构
+
+```
+~/.agents/skills/usage-check/
+├── SKILL.md
+└── scripts/
+    ├── usage-check.sh       # ⭐ 统一入口（默认调用）
+    ├── minimax-check.sh     # MiniMax Coding Plan
+    ├── tavily-check.sh      # Tavily API
+    └── deepseek-check.sh    # DeepSeek（默认禁用）
+```
+
+每个 check 脚本独立输出 JSON，统一入口做格式化和通知控制。
+
+## 统一入口用法
+
+```bash
+# 默认：人类可读汇总（含 DeepSeek disabled 提示）
+bash ~/.agents/skills/usage-check/scripts/usage-check.sh
+
+# 等价于 all 模式
+bash ~/.agents/skills/usage-check/scripts/usage-check.sh all
+
+# 合并 JSON 输出（适合 cron / 日志 / 二次处理）
+bash ~/.agents/skills/usage-check/scripts/usage-check.sh all json
+
+# 单模块
+bash ~/.agents/skills/usage-check/scripts/usage-check.sh minimax
+bash ~/.agents/skills/usage-check/scripts/usage-check.sh tavily
+bash ~/.agents/skills/usage-check/scripts/usage-check.sh deepseek
+
+# 单模块 + JSON
+bash ~/.agents/skills/usage-check/scripts/usage-check.sh minimax json
+```
+
+**环境变量**:
+
+| 变量 | 默认 | 作用 |
+|------|------|------|
+| `NO_NOTIF=1` | 0（发通知） | 关闭 macOS 通知 |
+| `SHOW_DEEPSEEK=1` | 0（禁用） | 启用 DeepSeek 模块 |
+
+**注意**: 入口脚本默认会发 macOS 通知。codex 计划任务调用时建议传 `NO_NOTIF=1`，由 codex 自己提醒。
+
+### 单脚本独立调用
+
+每个 check 脚本可独立调用（输出 JSON 到 stdout）:
+
+```bash
+SEND_NOTIF=0 bash ~/.agents/skills/usage-check/scripts/minimax-check.sh
+bash ~/.agents/skills/usage-check/scripts/tavily-check.sh
+SHOW_DEEPSEEK=1 bash ~/.agents/skills/usage-check/scripts/deepseek-check.sh
+```
+
+## 前置条件
+
+凭证统一存放在 `~/.agents/credentials/`（无例外）:
+
+| 凭证 | 路径 | 字段 |
+|------|------|------|
+| MiniMax API Key | `~/.agents/credentials/minimax.json` | `{"api_key": "sk-cp-..."}` |
+| Tavily API Key | `~/.agents/credentials/tavily.json` | `{"api_key": "tvly-..."}` |
+| DeepSeek API Key | `~/.agents/credentials/deepseek.json` | `{"apiKey": "sk-..."}`（小驼峰） |
+
+缺失凭证会输出 `{"error": "..."}` JSON 而非静默失败。建议 `chmod 600 ~/.agents/credentials/*.json`。
+
+## 健康检查阈值
+
+### MiniMax 窗口（5h 和 weekly 共用）
+
+基于 **剩余百分比**（注意是「剩余」不是「已用」）:
+
+| 剩余百分比 | 健康度 | emoji |
+|----------|--------|-------|
+| `≥ 50%` | 充足 | 💚 |
+| `20% ≤ p < 50%` | 正常 | 🟡 |
+| `10% ≤ p < 20%` | 紧张 | 🔴 |
+| `< 10%` | 紧急 | 🚨 |
+| `status=3` | 未启用 | ⚪ |
+
+5h 和 weekly **各自独立**评估。
+
+### Tavily（基于已用百分比）
+
+| 已用百分比 | 健康度 | emoji |
+|----------|--------|-------|
+| `< 50%` | 充足 | 💚 |
+| `50% ≤ p < 75%` | 正常 | 🟡 |
+| `75% ≤ p < 90%` | 紧张 | 🔴 |
+| `≥ 90%` | 紧急 | 🚨 |
+
+### DeepSeek（基于总余额 ¥）
+
+| 总余额 | 健康度 | emoji |
+|---------|--------|-------|
+| `≥ ¥50` | 充足 | 💚 |
+| `¥10 ≤ x < ¥50` | 正常 | 🟡 |
+| `¥1 ≤ x < ¥10` | 偏低 | 🔴 |
+| `< ¥1` | 即将耗尽 | 🚨 |
+
+## JSON Schema
+
+### 错误格式（所有模块统一）
+
+```json
+{"error": "凭证文件不存在: /path/to/cred", "fetched_at": "2026-07-13 14:00:00"}
+```
+
+### MiniMax
+
+```json
+{
+  "models": [
+    {
+      "model": "general",
+      "5h_window": {
+        "start_time": "07-13 10:00",
+        "end_time": "07-13 15:00",
+        "remaining_time": "30分钟",
+        "remaining_time_seconds": 1810,
+        "used_percent": 40,
+        "remaining_percent": 60,
+        "status": "active",
+        "status_text": "生效",
+        "health": "充足",
+        "health_emoji": "💚"
+      },
+      "weekly_window": {
+        "start_time": "07-13 00:00",
+        "end_time": "07-20 00:00",
+        "remaining_time": "6.4天",
+        "remaining_time_seconds": 552610,
+        "used_percent": 9,
+        "remaining_percent": 91,
+        "status": "active",
+        "status_text": "生效",
+        "boost_percent": 15.0,
+        "health": "充足",
+        "health_emoji": "💚"
+      }
+    }
+  ],
+  "fetched_at": "2026-07-13 14:00:00"
+}
+```
+
+**注意**: `video` 模型始终跳过，不出现在 JSON 里。
+
+### Tavily
+
+```json
+{
+  "plan": "Researcher",
+  "limit": 1000,
+  "used": 27,
+  "used_percent": 2.7,
+  "remaining": 973,
+  "search_usage": 27,
+  "health": "充足",
+  "health_emoji": "💚",
+  "fetched_at": "2026-07-13 14:00:00"
+}
+```
+
+### DeepSeek
+
+禁用时:
+```json
+{
+  "disabled": true,
+  "reason": "DeepSeek 模块默认禁用",
+  "enable_command": "SHOW_DEEPSEEK=1 bash ~/.agents/skills/usage-check/scripts/deepseek-check.sh",
+  "fetched_at": "2026-07-13 14:00:00"
+}
+```
+
+启用后（`SHOW_DEEPSEEK=1`）:
+```json
+{
+  "is_available": true,
+  "status_text": "可用",
+  "status_emoji": "✅",
+  "currency": "CNY",
+  "total_balance": "25.50",
+  "granted_balance": "20.00",
+  "topped_up_balance": "5.50",
+  "health": "正常",
+  "health_emoji": "🟡",
+  "fetched_at": "2026-07-13 14:00:00"
+}
+```
+
+## 人类可读输出样例
+
+```
+=== MiniMax 用量 ===
+【general】
+  ⏰ 5h窗口: 07-13 10:00 ~ 07-13 15:00 (生效) | 剩余 23分钟
+  📊 5h用量: 42% 已用 | 58% 剩 | 💚 充足
+  📅 本周窗口: 07-13 00:00 ~ 07-20 00:00 (生效) | 剩余 6.4天 | +15.0%
+  📈 本周用量: 9% 已用 | 91% 剩 | 💚 充足
+  ⏱️ 抓取时间: 2026-07-13 14:36:47
+
+=== Tavily 用量 ===
+📡 Tavily [Researcher]
+   已用: 27 / 1000 (2.7%)
+   剩余: 973 credits
+   搜索消耗: 27 credits
+   健康度: 💚 充足
+   ⏱️ 抓取时间: 2026-07-13 14:36:50
+
+=== DeepSeek 余额 ===
+⚪ 已禁用: DeepSeek 模块默认禁用
+   启用: SHOW_DEEPSEEK=1 bash ~/.agents/skills/usage-check/scripts/deepseek-check.sh
+```
+
+## macOS 通知
+
+入口脚本调用 minimax 时会发送 macOS 通知（含 5h + weekly 双窗口状态）。`NO_NOTIF=1` 可关闭。
+
+codex 计划任务调用建议:
+```bash
+NO_NOTIF=1 bash ~/.agents/skills/usage-check/scripts/usage-check.sh all
+```
+
+由 codex 计划任务统一发提醒，避免通知风暴。
+
+## 已知问题 / 陷阱
+
+1. **⚠️ MiniMax 用量端点是 `/v1/api/openplatform/coding_plan/remains`**:以下写法都会 404 或鉴权失败:
+   - `/v1/token_plan/remains`(缺 `api/openplatform` 前缀)
+   - `/coding_plan/remains`(不带 `/v1/api/openplatform`)
+   - `/v1/coding_plan/remains`(路径不对)
+   - 主机 `api.minimaxi.com`(这是 chat completions 域名)
+   唯一可用:`https://www.minimaxi.com/v1/api/openplatform/coding_plan/remains`(GET)
+
+2. **⚠️ MiniMax 响应字段不是 total/usage 计数**:API 返回 `current_interval_total_count=0` + `current_interval_usage_count=0`,**真实数据在 `current_interval_remaining_percent` / `current_weekly_remaining_percent`**。
+
+3. **⚠️ Tavily `/usage` 是唯一可用账户端点**:`/credits`、`/me`、`/remaining_credits`、`/user`、`/subscription` 都返回 404 或无响应。
+
+4. **⚠️ Coding Plan Key 完整性**:Key 必须完整(125 字符),本地存储被截断会导致 1004 login fail。复制后请校对字符数。
+
+5. **⚠️ 凭证文件权限**:建议 `chmod 600 ~/.agents/credentials/*.json`,避免 key 被同机其他用户读取。
+
+6. **API 限速**:MiniMax Coding Plan 查询建议间隔 ≥ 30s,频繁查询可能触发 429。**脚本不内置限速**,由调用方(codex 计划任务)控制。
+
+7. **curl 超时**:三个脚本都设了 10-15s 超时,无网络时会输出 `{"error": "API 请求超时"}`。
+
+8. **python3 依赖**:Mac 上 `/usr/bin/python3` (系统 3.9) 即可,无需额外环境。脚本只用到 `json` / `subprocess` / `datetime` 标准库。
+
+9. **⚠️ `weekly_boost_permille` 是千分比**:1500 = 15.0%,脚本已 `/100` 转换。
+
+10. **⚠️ `status` 字段值**:`1=生效`,`3=未启用`。JSON 用 `status="active|inactive"` 表达,`status_text` 给中文文案。
+
+11. **⚠️ DeepSeek 默认禁用**:`SHOW_DEEPSEEK=1` 才查询真实余额。DeepSeek 凭证支持 `apiKey`(小驼峰)和 `api_key`(下划线)两种字段名,优先 `apiKey`。
+
+12. **⚠️ macOS 通知副作用**:`usage-check.sh` 默认会发通知,单脚本调用 `minimax-check.sh` 也默认发通知。需关闭传 `NO_NOTIF=1` 或 `SEND_NOTIF=0`。
+
+## 相关 Skills
+
+- `minimax-image-generation`:图片生成(消耗 MiniMax 配额)
+- `minimax-web-search`:MiniMax Web Search
+- `web-search`:通用 Web 搜索(含 Tavily 后端)
+- `daily-finance`:每日财经(独立数据源,不消耗 MiniMax/Tavily)
+- `spider-expert`:网页爬取(可能调用 DeepSeek 做内容分析)

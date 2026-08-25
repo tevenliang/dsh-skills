@@ -1,0 +1,13 @@
+{
+  "name": "NeoData金融搜索服务",
+  "installedAt": 1779212819858,
+  "source": "marketplace",
+  "iconSource": "https://openplatform-cdn.codebuddy.cn/public/skills/icons/neodata-financial-search.png",
+  "version": "1.0.1",
+  "skillId": "skill_2053082432761950208",
+  "iconLocalPath": "/Users/tianwenliang/.agents/skills/neodata-financial-search/_icon.png",
+  "iconDownloadedFrom": "https://openplatform-cdn.codebuddy.cn/public/skills/icons/neodata-financial-search.png",
+  "skillName": "neodata-financial-search",
+  "description_zh": "自然语言查询股票、基金、宏观、外汇、大宗商品等金融数据",
+  "description_en": "Natural language financial search for stocks, funds, macro, FX and commodities"
+}

@@ -1,0 +1,3 @@
+{"ts": "2026-08-03T19:46:02+08:00", "event": "sub_process_spawning", "cmd": ["/Users/tianwenliang/.agents/.venv/bin/python3", "/Users/tianwenliang/.agents/skills/crawl/common-flow/crawl.py", "clip"]}
+{"ts": "2026-08-03T19:46:02+08:00", "event": "sub_process_started", "pid": 83909, "cmd": ["/Users/tianwenliang/.agents/.venv/bin/python3", "/Users/tianwenliang/.agents/skills/crawl/common-flow/crawl.py", "clip"]}
+{"ts": "2026-08-03T19:46:08+08:00", "event": "sub_process_exited", "exit_code": 0, "total_elapsed_sec": 5.1}

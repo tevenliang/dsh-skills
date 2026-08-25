@@ -1,0 +1,248 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+tools/jd.py — 京东多平台比价 (ominicrawl v3, 简化版)
+
+设计 (2026-08-04):
+- 每天一个比价文件: $VAULT/subscription/jd/多平台比价/YYYY-MM-DD_多平台比价.md
+- 取消每关键词一个目录, 全部统一在 多平台比价/ 子目录
+- 取消 process_search 重复入库 (crawl_batch 自管 publish, 返回 [] 跳过入库)
+- 每个关键词一个 H1 段, 单表格, 列含 平台 + 购买链接
+- 同一天重复跑批: 完全覆盖 (snapshot 语义)
+
+需要 price-compare HTTP API (op.squirrel2.cn).
+"""
+import sys
+import json
+import urllib.request
+from datetime import date
+from pathlib import Path
+
+SKILL_ROOT = str(Path(__file__).resolve().parent.parent)
+for _p in (SKILL_ROOT, str(Path(__file__).parent)):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
+
+# Vault subscription 路径
+_VAULT_SUBSCRIPTION = Path("/Users/tianwenliang/Documents/steven_vault/subscription")
+
+# ── price-compare HTTP API ───────────────────────────────────────────
+_PRICE_COMPARE_API = "http://op.squirrel2.cn/api/v1/search"
+_TIMEOUT = 20
+
+
+def _http_post(payload: dict) -> list:
+    """调 price-compare search API, 返回 list[dict]。失败返回 []。"""
+    body = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(
+        _PRICE_COMPARE_API,
+        data=body,
+        headers={"Content-Type": "application/json", "Accept": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:
+            data = resp.read().decode("utf-8")
+            result = json.loads(data)
+            if isinstance(result, list):
+                return result
+            # 有时候 API 返回 {"data": [...]} 包裹
+            if isinstance(result, dict):
+                for key in ("data", "result", "goods", "list"):
+                    if key in result and isinstance(result[key], list):
+                        return result[key]
+            return []
+    except Exception as e:
+        print(f"    [price-compare API] {e}")
+        return []
+
+
+def search_platform(keyword: str, platform: str, page_size: int = 10) -> list[dict]:
+    """用 price-compare API 搜指定平台商品，返回 list[dict]。"""
+    payload = {"platform": platform, "keyword": keyword, "page_size": page_size}
+    raw = _http_post(payload)
+    results = []
+    for item in raw:
+        title = (item.get("title") or item.get("shortTitle") or "").strip()
+        if not title:
+            continue
+        results.append({
+            "platform": platform,
+            "title": title,
+            "shortTitle": item.get("shortTitle", ""),
+            "shopName": item.get("shopName", ""),
+            "price": item.get("price", 0),
+            "originalPrice": item.get("originalPrice", 0),
+            "couponInfo": item.get("couponInfo", ""),
+            "couponAmount": item.get("couponAmount", 0),
+            "monthSales": item.get("monthSales", "0"),
+            "link": item.get("link", ""),
+            "skuId": item.get("skuId", ""),
+        })
+    return results
+
+
+# ── Markdown 渲染 ──────────────────────────────────────────────────
+DEFAULT_KEYWORDS = [
+    {"kw": "sony xm6", "label": "Sony WH-1000XM6"},
+    {"kw": "bose quietcomfort 45", "label": "Bose QuietComfort 45"},
+    {"kw": "小米抗噪耳机", "label": "小米抗噪耳机"},
+]
+
+_PLAT_LABEL = {"jd": "京东", "pdd": "拼多多", "taobao": "淘宝"}
+
+
+def _parse_sales(s) -> float:
+    """月销量解析: 支持 '4' / '1.5万+' / '1000+' / '' 等格式."""
+    s = str(s or "").strip()
+    if not s:
+        return 0.0
+    if "万" in s:
+        n = s.replace("万", "").replace("+", "").strip()
+        try:
+            return float(n) * 10000
+        except ValueError:
+            return 0.0
+    s_clean = s.replace("+", "").strip()
+    try:
+        return float(s_clean)
+    except ValueError:
+        return 0.0
+
+
+def _dedupe_rows(rows: list) -> list:
+    """按 (平台, 现价) 去重, 同组保留月销最高, 失败/平局保留先出现.
+
+    rows: [(plat, item), ...]
+    返回: 去重后 rows, 按 (平台序, -月销) 排序.
+    """
+    best = {}  # key=(plat, round(price,2)) -> (item, sales)
+    for plat, item in rows:
+        try:
+            price = round(float(item.get("price", 0) or 0), 2)
+        except (ValueError, TypeError):
+            price = 0.0
+        key = (plat, price)
+        sales = _parse_sales(item.get("monthSales", 0))
+        if key not in best or sales > best[key][1]:
+            best[key] = (item, sales)
+
+    plat_order = {"jd": 0, "pdd": 1, "taobao": 2}
+    result = []
+    for (plat, _), (item, _) in best.items():
+        result.append((plat, item))
+    result.sort(key=lambda x: (
+        plat_order.get(x[0], 99),
+        -_parse_sales(x[1].get("monthSales", 0)),
+    ))
+    return result
+
+
+def _now_iso() -> str:
+    """ISO timestamp with seconds, e.g. 2026-08-04T14:30:22"""
+    from datetime import datetime
+    return datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+
+
+def _build_md(sections: list, date_str: str) -> str:
+    """新版: 每个关键词一个 H1, 单表格, 列含 平台 + 购买链接.
+
+    sections: [(label, [(plat, item), ...]), ...]
+    """
+    lines = [
+        "---",
+        f'title: "{date_str} 多平台比价"',
+        "type: price-compare",
+        f"collected_at: {_now_iso()}",
+        "source: price-compare-api",
+        f"keywords: {json.dumps([s[0] for s in sections], ensure_ascii=False)}",
+        f"section_count: {len(sections)}",
+        "---",
+        "",
+    ]
+    for label, rows in sections:
+        deduped = _dedupe_rows(rows)
+        if not deduped:
+            continue
+        lines.append(f"# {label}")
+        lines.append("")
+        lines.append("| 商品 | 平台 | 现价 | 月销 | 优惠券 | 购买链接 |")
+        lines.append("| --- | --- | --- | --- | --- | --- |")
+        for plat, item in deduped:
+            title = (item.get("shortTitle") or item.get("title", ""))[:60]
+            link = item.get("link", "")
+            title_md = f"[{title}]({link})" if link else title
+            price = item.get("price", 0)
+            sales = item.get("monthSales", "0")
+            coupon = item.get("couponInfo", "") or "-"
+            plat_label = _PLAT_LABEL.get(plat, plat)
+            lines.append(
+                f"| {title_md} | {plat_label} | ¥{price} | {sales} | {coupon} | "
+                f"[购买]({link}) |"
+            )
+        lines.append("")
+    return "\n".join(lines)
+
+
+# ── crawl_batch (对外入口) ───────────────────────────────────────────
+def crawl_batch(date_yymmdd=None):
+    """每天一个比价文件: subscription/jd/多平台比价/YYYY-MM-DD_多平台比价.md
+
+    自管 publish: 直接写目标文件, 返回 [] 让 process_search 跳过统一入库.
+    同一天重复跑批会完全覆盖 (snapshot 语义).
+    """
+    try:
+        from common.feishu_watchlist import get_jd_keywords
+        keywords = get_jd_keywords()
+    except Exception as e:
+        print(f"  [warn] 飞书京东关键词读取失败, 用默认: {e}")
+        keywords = []
+    keywords = keywords or DEFAULT_KEYWORDS
+
+    if not keywords:
+        print("  ⚠️  无关键词, 跳过")
+        return []
+
+    # 目标路径 (每天一个文件)
+    today = date.today().isoformat()  # YYYY-MM-DD
+    out_dir = _VAULT_SUBSCRIPTION / "jd" / "多平台比价"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out_path = out_dir / f"{today}_多平台比价.md"
+
+    # 抓每个关键词的 3 平台结果
+    sections = []
+    for item in keywords:
+        kw = (item.get("kw") or "").strip()
+        if not kw:
+            continue
+        label = (item.get("label") or kw).strip()
+        print(f"  🔍 多平台比价: {kw}")
+        rows = []
+        for plat in ["jd", "pdd", "taobao"]:
+            try:
+                results = search_platform(kw, plat, 10)
+            except Exception as e:
+                print(f"    [{plat}] 失败: {e}")
+                continue
+            if results:
+                print(f"    {plat}: {len(results)} 条")
+                for r in results:
+                    rows.append((plat, r))
+        if not rows:
+            print(f"    [skip] {kw} 无结果")
+            continue
+        sections.append((label, rows))
+
+    if not sections:
+        print("  ⚠️  全部关键词无结果, 不写文件")
+        return []
+
+    # 写文件 (完全覆盖, snapshot 语义)
+    md = _build_md(sections, today)
+    out_path.write_text(md, encoding="utf-8")
+    print(f"  ✅ 京东完成: 1 个文件 ({out_path.name}, {len(sections)} 关键词)")
+    return []  # 自管 publish, process_search 跳过入库
+
+
+if __name__ == "__main__":
+    for _ in crawl_batch():
+        pass

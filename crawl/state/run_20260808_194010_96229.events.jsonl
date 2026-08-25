@@ -1,0 +1,4 @@
+{"ts": "2026-08-08T19:40:10+08:00", "event": "run_started", "date": "20260808"}
+{"ts": "2026-08-08T19:40:23+08:00", "event": "phase_started", "phase": "watchlist"}
+{"ts": "2026-08-08T19:40:23+08:00", "event": "sub_process_spawning", "cmd": ["/Users/tianwenliang/.agents/skills/crawl/../../.venv/bin/python3", "/Users/tianwenliang/.agents/skills/crawl/common-flow/crawl.py", "watchlist", "--date", "20260808"]}
+{"ts": "2026-08-08T19:40:23+08:00", "event": "sub_process_started", "pid": 96247, "cmd": ["/Users/tianwenliang/.agents/skills/crawl/../../.venv/bin/python3", "/Users/tianwenliang/.agents/skills/crawl/common-flow/crawl.py", "watchlist", "--date", "20260808"]}

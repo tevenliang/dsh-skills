@@ -1,0 +1,13 @@
+{
+  "name": "飞书套件",
+  "installedAt": 1778985773281,
+  "source": "marketplace",
+  "iconSource": "https://openplatform-cdn.codebuddy.cn/public/skills/icons/lark-unified.svg",
+  "version": "1.0.3",
+  "skillId": "skill_2053082253572640768",
+  "iconLocalPath": "/Users/tianwenliang/.agents/skills/lark-cli/_icon.svg",
+  "iconDownloadedFrom": "https://openplatform-cdn.codebuddy.cn/public/skills/icons/lark-unified.svg",
+  "skillName": "lark-unified",
+  "description_zh": "飞书/Lark 全能套件（消息、文档、表格、日历、任务、Wiki 等 11 个业务域）",
+  "description_en": "Lark/Feishu unified CLI: messaging, docs, sheets, calendar, tasks, wiki & more"
+}

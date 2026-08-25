@@ -1,0 +1,141 @@
+  dynamic: 'ambient',
+};
+const LAYOUT_INSPECTION_CACHE = new Map();
+const EMPTY_REQUIRED_CONTENT_SHAPE = {
+  titleChars: 0,
+  itemCount: 0,
+  minItemCount: 0,
+  numericItemCount: 0,
+  valueItemCount: 0,
+  rawNumericItemCount: 0,
+  textualValueItemCount: 0,
+  unitItemCount: 0,
+  secondaryLabelItemCount: 0,
+  durationItemCount: 0,
+  pageLabelItemCount: 0,
+  nestedDepth: 0,
+  requiresValue: false,
+};
+const EMPTY_PREFERRED_CONTENT_SHAPE = {
+  summaryChars: 0,
+  takeawayChars: 0,
+  detailItemCount: 0,
+  chartPointCount: 0,
+  priority: '',
+};
+
+export function contentShapeFromPresentation(presentation = {}, hints = {}) {
+  const items = deriveTemplateItems(presentation);
+  const positive = key => {
+    const value = Number(hints?.[key]);
+    return Number.isFinite(value) && value > 0 ? Math.round(value) : 0;
+  };
+  const valueItemCount = items.filter(item => (
+    hasContentValue(item?.value) || hasContentValue(item?.displayValue)
+  )).length || positive('valueItemCount') || positive('numericItemCount');
+  const rawNumericItemCount = items.filter(item => (
+    Number.isFinite(item?.chartValue)
+  )).length || positive('rawNumericItemCount');
+  const textualValueItemCount = items.filter(item => (
+    hasContentValue(item?.displayValue)
+    && (
+      typeof item?.value !== 'number'
+      || !Number.isFinite(item.value)
+      || String(item.displayValue) !== String(item.value)
+    )
+  )).length || positive('textualValueItemCount');
+  const unitItemCount = items.filter(item => hasContentValue(item?.unit)).length
+    || positive('unitItemCount');
+  const secondaryLabelItemCount = items.filter(item => (
+    hasContentValue(item?.secondaryLabel)
+    || hasContentValue(item?.projectionSecondaryLabel)
+  )).length || positive('secondaryLabelItemCount');
+  const durationItemCount = items.filter(item => (
+    hasContentValue(item?.duration)
+    || hasContentValue(item?.projectionDuration)
+  )).length || positive('durationItemCount');
+  const pageLabelItemCount = items.filter(item => (
+    hasContentValue(item?.pageLabel)
+    || hasContentValue(item?.projectionPageLabel)
+  )).length || positive('pageLabelItemCount');
+  const itemCount = items.length || positive('itemCount');
+  const minimumProjectionSlots = items.length
+    ? Math.max(1, Math.ceil(items.length / 2))
+    : 0;
+  return {
+    required: {
+      titleChars: charLength(presentation?.titleShort || presentation?.title || '')
+        || positive('titleChars'),
+      itemCount,
+      minItemCount: items.length
+        ? Math.min(items.length, minimumProjectionSlots)
+        : positive('minItemCount') || itemCount,
+      numericItemCount: valueItemCount,
+      valueItemCount,
+      rawNumericItemCount,
+      textualValueItemCount,
+      unitItemCount,
+      secondaryLabelItemCount,
+      durationItemCount,
+      pageLabelItemCount,
+      nestedDepth: positive('requiredNestedDepth') || positive('nestedDepth'),
+      requiresValue: valueItemCount > 0,
+    },
+    preferred: {
+      summaryChars: charLength(presentation?.summaryShort || presentation?.summary || '')
+        || positive('summaryChars'),
+      takeawayChars: charLength(presentation?.takeaway || '')
+        || positive('takeawayChars'),
+      detailItemCount: items.filter(item => hasContentValue(item?.detail)).length
+        || positive('detailItemCount'),
+      chartPointCount: Array.isArray(presentation?.chartData)
+        ? presentation.chartData.length
+        : positive('chartPointCount'),
+      priority: String(hints?.priority || '').trim().toLowerCase(),
+    },
+  };
+}
+
+function hasContentValue(value) {
+  return value !== undefined && value !== null && value !== '';
+}
+
+/** @param {import('../../src/types').ListLayoutsOptions} [options] */
+export function listLayouts({
+  theme,
+  role,
+  keyword,
+  contentShape = null,
+  needsMedia = false,
+  plannedImages = false,
+  providedImages = false,
+  providedMedia = false,
+  imageGen = false,
+  needsVisual = false,
+  mediaCount = null,
+  mediaKind = null,
+  requireInitialMedia = false,
+  limit = 12,
+  seed = null,
+} = {}) {
+  const requestedRole = role ? String(role).trim().toLowerCase() : '';
+  const normalizedRole = requestedRole ? ROLE_ALIASES[requestedRole] || requestedRole : '';
+  const keywordText = String(keyword || '').trim().toLowerCase();
+  const requestedMediaCount = getRequestedMediaCount({ plannedImages, providedImages, providedMedia, imageGen, needsVisual, mediaCount });
+  const normalizedMediaKind = normalizeMediaKind(mediaKind);
+  const needsInitialMedia = Boolean(requireInitialMedia || providedImages || providedMedia);
+  const requiresMedia = needsMedia || requestedMediaCount > 0 || needsInitialMedia || Boolean(normalizedMediaKind);
+  const normalizedContentShape = normalizeContentShape(contentShape);
+
+  const rows = listLayoutsForMediaCount({
+    theme,
+    normalizedRole,
+    keywordText,
+    contentShape: normalizedContentShape,
+    requiresMedia,
+    requestedMediaCount,
+    normalizedMediaKind,
+    needsInitialMedia,
+    seed,
+  });
+  return rows

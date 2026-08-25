@@ -1,0 +1,18 @@
+{
+  "slug": "web-search-exa",
+  "name": "web-search-exa",
+  "description": "Neural web search, content extraction and deep research via Exa AI",
+  "metadata": {
+    "openclaw": {
+      "requires": {
+        "env": ["EXA_API_KEY"],
+        "bins": []
+      }
+    }
+  },
+  "search": true,
+  "call": {
+    "kind": "shell",
+    "template": "python3 {skill_dir}/scripts/exa_search.py '{query}' --num-results 8"
+  }
+}

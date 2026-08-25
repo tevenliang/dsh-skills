@@ -1,0 +1,339 @@
+---
+name: usage-check
+description: API 用量查询 + VM 资源监控（JSON 结构化输出）— MiniMax Coding Plan（5h窗口+周统计双健康检查）、Tavily API 额度、DeepSeek 余额、VM (Hermes) 硬盘/内存/CPU（已移除Bailian部分）。触发词：「用量查询」「查用量」「API 用量」「查配额」「DeepSeek 余额」「VM 状态」「Bailian 额度」
+version: "6.0.0"
+---
+
+# 用量查询 + VM 资源监控 Skill
+
+五个独立只读检查 + 一个守卫脚本，所有模块输出 **structured JSON**。Bailian 模块已拆分为展示（bailian）和守卫（bailian-guard）两部分。
+
+## Overview
+
+| 模块 | 状态 | 数据源 |
+|------|------|--------|
+| **MiniMax Coding Plan** | ✅ 启用 | `https://www.minimaxi.com/v1/api/openplatform/coding_plan/remains` |
+| **Tavily API** | ✅ 启用 | `https://api.tavily.com/usage` |
+| **DeepSeek** | ⏸ 默认禁用 | `https://api.deepseek.com/user/balance` |
+| **VM (Hermes) 资源** | ✅ 启用 | SSH `ubuntu@175.178.210.156`（无额外凭证） |
+| **Bailian 百炼额度展示** | ✅ 启用 | `bl usage free --all`（只读）+ `~/.opencodex/config.json` |
+| **Bailian 百炼守卫** | ✅ 启用 | `bl usage free --all` + config 写入 + `opencodex restart`（有副作用） |
+
+触发词：「用量查询」「查用量」「API 用量」「查配额」「MiniMax 用量」「Tavily 用量」「DeepSeek 余额」「查余额」「VM 状态」
+
+## 架构
+
+```
+~/.agents/skills/System/usage-check/scripts/
+├── usage-check.sh           # ⭐ 统一入口
+├── minimax-check.sh         # MiniMax Coding Plan
+├── tavily-check.sh          # Tavily API
+├── deepseek-check.sh        # DeepSeek（默认禁用）
+├── vm-check.py              # VM SSH 查询（Python3，输出 JSON）
+├── bailian-check.sh         # Bailian qwen-free 额度展示（Python3）
+└── bailian-quota-guard.sh   # Bailian 百炼守卫，有副作用（Python3）
+~/.opencodex/scripts/
+└── bailian-quota-guard.sh   # Wrapper → 转发到 skills 目录的 Python 脚本
+```
+
+## 用法
+
+```bash
+# 默认：人类可读汇总（all = minimax + vm + tavily + deepseek + bailian）
+bash ~/.agents/skills/System/usage-check/scripts/usage-check.sh
+
+# 合并 JSON 输出（适合 cron / 日志）
+bash ~/.agents/skills/System/usage-check/scripts/usage-check.sh all json
+
+# 单模块
+bash ~/.agents/skills/System/usage-check/scripts/usage-check.sh minimax
+bash ~/.agents/skills/System/usage-check/scripts/usage-check.sh tavily
+bash ~/.agents/skills/System/usage-check/scripts/usage-check.sh vm
+bash ~/.agents/skills/System/usage-check/scripts/usage-check.sh bailian        # 纯展示（只读）
+bash ~/.agents/skills/System/usage-check/scripts/usage-check.sh bailian-guard  # 守卫（有副作用）
+bash ~/.agents/skills/System/usage-check/scripts/usage-check.sh deepseek
+
+# 单模块 + JSON
+bash ~/.agents/skills/System/usage-check/scripts/usage-check.sh bailian json
+bash ~/.agents/skills/System/usage-check/scripts/usage-check.sh bailian-guard
+
+# 旧路径（心跳自动化依赖，自动转发到 skills 目录 Python 脚本）
+~/.opencodex/scripts/bailian-quota-guard.sh >> /path/to/log 2>&1
+```
+
+**环境变量**
+
+| 变量 | 默认 | 作用 |
+|------|------|------|
+| `SHOW_DEEPSEEK=1` | 0（禁用） | 启用 DeepSeek 模块 |
+
+### 单脚本独立调用
+
+```bash
+bash ~/.agents/skills/System/usage-check/scripts/minimax-check.sh
+bash ~/.agents/skills/System/usage-check/scripts/tavily-check.sh
+SHOW_DEEPSEEK=1 bash ~/.agents/skills/System/usage-check/scripts/deepseek-check.sh
+python3 ~/.agents/skills/System/usage-check/scripts/vm-check.py
+python3 ~/.agents/skills/System/usage-check/scripts/bailian-check.sh
+python3 ~/.agents/skills/System/usage-check/scripts/bailian-quota-guard.sh
+```
+
+## 前置条件
+
+凭证统一存放在 `~/.agents/credentials/`（无例外）:
+
+| 凭证 | 路径 | 字段 |
+|------|------|------|
+| MiniMax API Key | `~/.agents/credentials/minimax.json` | `{"api_key": "sk-cp-..."}` |
+| Tavily API Key | `~/.agents/credentials/tavily.json` | `{"api_key": "tvly-..."}` |
+| DeepSeek API Key | `~/.agents/credentials/deepseek.json` | `{"apiKey": "sk-..."}`（小驼峰） |
+
+VM 无需额外凭证（使用 SSH key 免密登录）。缺失凭证会输出 `{"error": "..."}` JSON 而非静默失败。建议 `chmod 600 ~/.agents/credentials/*.json`。
+Bailian 模块依赖 `bl` CLI（百炼 CLI）和本目录下的 Python 脚本（需先安装百炼 CLI 并配置凭证）。
+
+## 健康检查阈值
+
+### MiniMax 窗口（5h 和 weekly 共用）
+
+基于 **剩余百分比**（注意是「剩余」不是「已用」）:
+
+| 剩余百分比 | 健康度 | emoji |
+|----------|--------|-------|
+| `≥ 50%` | 充足 | 💚 |
+| `20% ≤ p < 50%` | 正常 | 🟡 |
+| `10% ≤ p < 20%` | 紧张 | 🔴 |
+| `< 10%` | 紧急 | 🚨 |
+| `status=3` | 未启用 | ⚪ |
+
+### Tavily（基于已用百分比）
+
+| 已用百分比 | 健康度 | emoji |
+|----------|--------|-------|
+| `< 50%` | 充足 | 💚 |
+| `50% ≤ p < 75%` | 正常 | 🟡 |
+| `75% ≤ p < 90%` | 紧张 | 🔴 |
+| `≥ 90%` | 紧急 | 🚨 |
+
+### DeepSeek（基于总余额 ¥）
+
+| 总余额 | 健康度 | emoji |
+|---------|--------|-------|
+| `≥ ¥50` | 充足 | 💚 |
+| `¥10 ≤ x < ¥50` | 正常 | 🟡 |
+| `¥1 ≤ x < ¥10` | 偏低 | 🔴 |
+| `< ¥1` | 即将耗尽 | 🚨 |
+
+### VM
+
+| 指标 | 阈值 | 紧张 | 紧急 |
+|------|------|------|------|
+| 硬盘已用% | `≥75%` 紧张，`≥90%` 紧急 | 🔴 | 🚨 |
+| 内存已用% | `≥75%` 紧张，`≥90%` 紧急 | 🔴 | 🚨 |
+| CPU 使用% | `≥70%` 紧张，`≥90%` 紧急 | 🔴 | 🚨 |
+
+### Bailian qwen-free
+
+| 剩余额度百分比 | 健康度 | emoji |
+|-------------|--------|-------|
+| `≥ 50%` | 充足 | 💚 |
+| `20% ≤ p < 50%` | 正常 | 🟡 |
+| `10% ≤ p < 20%` | 紧张 | 🔴 |
+| `< 10%` | 紧急 | 🚨 |
+| 无免费额度记录 | - | ⚪ |
+
+## JSON Schema
+
+### 错误格式（所有模块统一）
+
+```json
+{"error": "凭证文件不存在: /path/to/cred", "fetched_at": "2026-07-13 14:00:00"}
+```
+
+### MiniMax
+
+```json
+{
+  "models": [{
+    "model": "general",
+    "5h_window": {
+      "start_time": "07-13 10:00", "end_time": "07-13 15:00",
+      "remaining_time": "30分钟", "remaining_time_seconds": 1810,
+      "used_percent": 40, "remaining_percent": 60,
+      "status": "active", "status_text": "生效",
+      "health": "充足", "health_emoji": "💚"
+    },
+    "weekly_window": {
+      "start_time": "07-13 00:00", "end_time": "07-20 00:00",
+      "remaining_time": "6.4天", "remaining_time_seconds": 552610,
+      "used_percent": 9, "remaining_percent": 91,
+      "status": "active", "status_text": "生效",
+      "boost_percent": 15.0,
+      "health": "充足", "health_emoji": "💚"
+    }
+  }],
+  "fetched_at": "2026-07-13 14:00:00"
+}
+```
+
+### Tavily
+
+```json
+{
+  "plan": "Researcher", "limit": 1000, "used": 27,
+  "used_percent": 2.7, "remaining": 973, "search_usage": 27,
+  "health": "充足", "health_emoji": "💚",
+  "fetched_at": "2026-07-13 14:00:00"
+}
+```
+
+### DeepSeek
+
+禁用时:
+```json
+{
+  "disabled": true,
+  "reason": "DeepSeek 模块默认禁用",
+  "enable_command": "SHOW_DEEPSEEK=1 bash ...",
+  "fetched_at": "2026-07-13 14:00:00"
+}
+```
+
+启用后:
+```json
+{
+  "is_available": true, "status_text": "可用", "status_emoji": "✅",
+  "currency": "CNY", "total_balance": "25.50",
+  "granted_balance": "20.00", "topped_up_balance": "5.50",
+  "health": "正常", "health_emoji": "🟡",
+  "fetched_at": "2026-07-13 14:00:00"
+}
+```
+
+### VM
+
+```json
+{
+  "disk":   {"total_gb": 40, "used_gb": 31, "avail_gb": 7, "used_percent": 82, "health": "紧张", "health_emoji": "🔴"},
+  "memory": {"total_mb": 3723, "used_mb": 2105, "avail_mb": 1617, "used_percent": 56.5, "health": "正常", "health_emoji": "🟡"},
+  "cpu":    {"used_percent": 26.8, "load_avg": "4.12, 3.51, 3.25", "health": "充足", "health_emoji": "🟢"},
+  "host": "175.178.210.156",
+  "fetched_at": "2026-08-18 18:37:39"
+}
+```
+
+### Bailian qwen-free（bailian-check.sh）
+
+```json
+{
+  "combo": "qwen-free",
+  "fetched_at": "2026-08-20 00:07:56",
+  "models": [
+    {
+      "model": "deepseek-v4-pro",
+      "in_free_list": true,
+      "used": 4136,
+      "total": 1000000,
+      "remaining": 995864,
+      "pct": 99.6,
+      "health": "💚",
+      "health_text": "充足"
+    },
+    {
+      "model": "qwen3.5-flash",
+      "in_free_list": true,
+      "used": 106763,
+      "total": 1000000,
+      "remaining": 893237,
+      "pct": 89.3,
+      "health": "💚",
+      "health_text": "充足"
+    }
+  ]
+}
+```
+
+## 人类可读输出样例
+
+```
+=== MiniMax 用量 ===
+【general】
+  ⏰ 5h窗口: 08-20 00:00 ~ 08-20 05:00 (生效) | 剩余 4.9小时
+  📊 5h用量: 2% 已用 | 98% 剩 | 💚 充足
+  📅 本周窗口: 08-17 00:00 ~ 08-24 00:00 (生效) | 剩余 4.0天
+  📈 本周用量: 71% 已用 | 29% 剩 | 🟡 正常
+  ⏱️ 抓取时间: 2026-08-20 00:07:47
+
+=== VM (Hermes) 状态 ===
+💾 硬盘 [40G total]
+   已用: 31G / 40G (83%) | 剩余 7G | 🔴 紧张
+🧠 内存 [3723M total]
+   已用: 2521M / 3723M (67.7%) | 可用 1201M | 🟡 正常
+⚙️  CPU [使用 6.7% | load 0.01, 0.13, 0.27] | 🟢 充足
+   ⏱️ 抓取时间: 2026-08-20 00:07:48
+
+=== Tavily 用量 ===
+📡 Tavily [Researcher]
+   已用: 326 / 1000 (32.6%)
+   剩余: 674 credits
+   搜索消耗: 326 credits
+   健康度: 💚 充足
+   ⏱️ 抓取时间: 2026-08-20 00:07:51
+
+=== DeepSeek 余额 ===
+⚪ 已禁用: DeepSeek 模块默认禁用
+   启用: SHOW_DEEPSEEK=1 bash ~/.agents/skills/usage-check/scripts/deepseek-check.sh
+
+=== Bailian 百炼 qwen-free 额度 ===
+combo: qwen-free | 抓取: 2026-08-20 00:07:56
+
+| 模型 | 已用 | 剩余 | 额度% | 健康 |
+|------|------|------|-------|------|
+| deepseek-v4-pro | 4136 | 995864 | 99.6% | 💚 充足 |
+| qwen3.5-flash | 106763 | 893237 | 89.3% | 💚 充足 |
+| deepseek-v4-flash | 73 | 999927 | 100.0% | 💚 充足 |
+| qwen3.7-max | 398369 | 601631 | 60.2% | 💚 充足 |
+| qwen3.8-max | 2390 | 997610 | 99.8% | 💚 充足 |
+```
+
+## 已知问题 / 陷阱
+
+1. **⚠️ MiniMax 用量端点是 `/v1/api/openplatform/coding_plan/remains`**: 唯一可用 URL 为 `https://www.minimaxi.com/v1/api/openplatform/coding_plan/remains` (GET)
+
+2. **⚠️ MiniMax 响应字段不是 total/usage 计数**: 真实数据在 `current_interval_remaining_percent` / `current_weekly_remaining_percent`
+
+3. **⚠️ Tavily `/usage` 是唯一可用账户端点**: `/credits`、`/me`、`/remaining_credits` 等均 404
+
+4. **⚠️ Coding Plan Key 完整性**: Key 必须完整（125 字符），本地存储被截断会导致 1004 login fail
+
+5. **⚠️ 凭证文件权限**: 建议 `chmod 600 ~/.agents/credentials/*.json`
+
+6. **API 限速**: MiniMax Coding Plan 查询建议间隔 ≥ 30s，**脚本不内置限速**，由调用方控制
+
+7. **curl 超时**: 三个脚本都设了 10-15s 超时，无网络时输出 `{"error": "API 请求超时"}`
+
+8. **python3 依赖**: Mac 上 `/usr/bin/python3` 即可，无需额外环境
+
+9. **⚠️ `weekly_boost_permille` 是千分比**: 1500 = 15.0%，脚本已 `/100` 转换
+
+10. **⚠️ DeepSeek 默认禁用**: `SHOW_DEEPSEEK=1` 才查询真实余额
+
+11. **⚠️ VM SSH**: `vm-check.py` 依赖 SSH key 免密登录（`BatchMode=yes`），需确保 `~/.ssh/config` 已配置
+
+12. **⚠️ Bailian 模块已拆分为两个脚本**:
+    - `bailian-check.sh`（Python3）：纯展示，只读，从 `~/.opencodex/config.json` 读取 qwen-free targets 并从 `bl usage free --all` 匹配实际额度，**无副作用**
+    - `bailian-quota-guard.sh`（Python3）：守卫脚本，读取 qwen-free targets，当模型额度 < 10% 时自动从 combo 中移除该模型并重启 opencodex，**有副作用**
+    - `~/.opencodex/scripts/bailian-quota-guard.sh` 是 wrapper，自动转发到 skills 目录的 Python 脚本
+
+13. **⚠️ Bailian 日志**: bailian-quota-guard.sh 执行日志输出到 `~/.agents/skills/System/usage-check/scripts/bailian-quota-guard.log`，每次运行追加，便于排查问题。
+
+14. **⚠️ Bailian qwen-free 模型列表**: 从 `~/.opencodex/config.json` 动态读取 `combos["qwen-free"]["targets"]`，不再硬编码模型名称，与 opencodex 路由配置保持同步。
+
+15. **⚠️ Bailian 依赖 `bl` CLI**: 需确保 `bl usage free --all` 命令可用，且 opencodex 配置路径正确。
+
+## 相关 Skills
+
+- `minimax-image-generation`: 图片生成（消耗 MiniMax 配额）
+- `minimax-web-search`: MiniMax Web Search
+- `web-search`: 通用 Web 搜索（含 Tavily 后端）
+- `crawl`: 网页爬取（可能调用 DeepSeek 做内容分析）
+- `bailian-cli`: 阿里云百炼 CLI 管理

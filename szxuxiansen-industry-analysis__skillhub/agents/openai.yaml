@@ -1,0 +1,5 @@
+interface:
+  display_name: "行业分析"
+  short_description: "投资级行业分析工作流：商业模式、市场规模、竞争格局、生命周期与估值"
+  default_prompt: "Use $industry-analysis 对「XX 行业」做一次全流程行业分析并输出结构化研报。"
+

@@ -1,0 +1,68 @@
+---
+name: ocx-cli
+description: opencodex 本地代理管理 CLI。当用户提到 ocx、opencodex、10100 代理、provider 同步、或需要在 Codex 中同步路由模型时使用此技能。
+---
+
+# opencodex CLI
+
+## 环境准备
+
+opencodex 安装在 `~/.npm-global/bin/ocx`。**每次运行必须加 `env -u NODE_OPTIONS`** 避免 managed node 22 冲突：
+
+```bash
+export PATH="$HOME/.npm-global/bin:$PATH"
+alias ocx='env -u NODE_OPTIONS ocx'
+```
+
+## 核心命令
+
+```bash
+ocx start          # 启动代理（后台，localhost:10100），自动 sync 模型
+ocx restart        # 仅重启代理（不改 codex 配置）
+ocx ready --wait   # 等代理就绪
+ocx status         # 代理状态
+
+ocx sync           # 关键：把 config.json 路由注入 config.toml + 更新 catalog
+ocx stop           # 一键还原 codex 原生配置（可逆，零残留）
+
+ocx provider list  # 已配置 provider
+ocx provider add <名> --api-key <key>  # 加 provider（如 deepseek / minimax-cn）
+ocx provider test <名>  # 连通性（注意：/models 发现可能被 destination policy 拦，chat 不受影响）
+
+ocx models         # 当前暴露的模型
+ocx account list / refresh openai  # ChatGPT 订阅账号状态
+```
+
+## 工作流：Dashboard 加 provider 后同步到 Codex
+
+用户（在 dashboard 网页操作后）告诉你已加好 provider 或模型 → 执行：
+
+```bash
+export PATH="$HOME/.npm-global/bin:$PATH"
+alias ocx='env -u NODE_OPTIONS ocx'
+ocx sync
+```
+
+然后提醒用户：**重启 Codex 桌面端**后选择器里才能看到新模型。
+
+## 涉及的文件
+
+| 文件 | 作用 |
+|---|---|
+| `~/.opencodex/config.json` | opencodex 权威配置（provider 路由、API key、账号池） |
+| `~/.codex/config.toml` | Codex 根配置，`openai_base_url = "http://127.0.0.1:10100/v1"` + `model_provider = "openai"` 由 `ocx sync` 注入 |
+| `model_catalog_json` 指向的文件（`cc-switch-model-catalog.json`） | Codex 选择器模型清单，由 `ocx sync` 重新生成 |
+
+## 验证路由
+
+```bash
+curl -s -m 50 -X POST http://127.0.0.1:10100/v1/responses \
+  -H "Content-Type: application/json" \
+  -d '{"model":"deepseek/deepseek-v4-flash","input":[{"role":"user","content":"hi"}],"store":false,"stream":true}'
+```
+
+## 常见坑
+
+- `ocx sync` 不会覆盖外部 `model_provider`；需确保根 `model_provider = "openai"`
+- `ocx provider test` 报 failed 不一定是路由不通，/models 发现可能被 destination policy 拦，但 chat 路由正常
+- 改完 dashboard 配置必须 `ocx sync` 才能同步到 Codex，重启 Codex 桌面端才能刷新选择器

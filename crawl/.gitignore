@@ -1,0 +1,15 @@
+# 运行产物（不纳入版本控制）
+logs/
+notes/
+media/
+state/state.db
+*.dump
+*.bak.*
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# venv（已软链到 ominicrawl/.venv）
+.venv/

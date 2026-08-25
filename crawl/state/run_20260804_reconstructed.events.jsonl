@@ -1,0 +1,6 @@
+{"ts":"2026-08-04T17:25:11+08:00","event":"run_started","date":"20260804","reconstructed":true,"source":"run_20260804_172511.out + tagged events"}
+{"ts":"2026-08-04T17:27:47+08:00","event":"phase_started","phase":"watchlist"}
+{"ts":"2026-08-04T18:25:54+08:00","event":"phase_finished","phase":"watchlist","duration_sec":3487.1}
+{"ts":"2026-08-04T18:25:54+08:00","event":"phase_started","phase":"clip"}
+{"ts":"2026-08-04T18:27:54+08:00","event":"phase_finished","phase":"clip","duration_sec":120.0}
+{"ts":"2026-08-04T18:28:19+08:00","event":"run_finished","exit_code":0,"reconstructed":true}

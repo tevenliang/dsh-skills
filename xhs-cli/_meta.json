@@ -1,0 +1,16 @@
+{
+  "name": "xhs-cli",
+  "description": "小红书(xiaohongshu) on-demand 关键字搜索 + 详情抓取工具",
+  "search": true,
+  "requires": {
+    "bins": ["xhs"],
+    "env": []
+  },
+  "call": {
+    "kind": "shell",
+    "template": "python3 /Users/tianwenliang/.agents/skills/CLI/xhs-cli/scripts/xhs_search.py search '<QUERY>' --limit 10 --render",
+    "params": {
+      "QUERY": "string (required)"
+    }
+  }
+}

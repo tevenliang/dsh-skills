@@ -1,0 +1,535 @@
+#!/usr/env python3
+# -*- coding: utf-8 -*-
+"""
+pipeline/run.py — ominicrawl 流水线路由 (ominicrawl v1)
+
+职责: 把「来源层(crawl.py) 给的 URL / 平台 + 日期」路由到对应 tools/<平台> fetcher,
+然后按平台执行流水线, 最后发布到 vault (subscription/)。
+
+两类入口:
+  process_url(url, dest)
+      URL 型平台 (bilibili/douyin/xiaohongshu/generic/wechat)
+      dest = {"mode": "clip"|"watchlist", "date": "260709"(watchlist 用)}
+      流程: tools/<p>.crawl(url, tmp) → push(单篇 vault subscription/) → [summarize_and_insert]
+  process_search(platform, date_yymmdd)
+      搜索型平台 (boss/jd/linkedin/tieba)
+      流程: tools/<p>.crawl_batch(date) → 每条 push_aggregated_batch (落 vault, 无 LLM 总结)
+
+流水线细则 (v5):
+  bilibili/douyin → 转录(已在 fetcher 内完成) + 总结 + 推 vault
+  xiaohongshu      → OCR(已在 fetcher 内下载图) + 总结 + 推 vault
+  generic(web)     → 总结 + 推 vault
+  wechat           → 推 vault (不总结)
+  boss/jd/li/tieba → opencli 原始单文件 (不总结)
+
+落点: $VAULT/subscription (publish_vault, 双平台回退):
+  clip/单条 → $VAULT/subscription/<平台>/<博主>/hot.md
+  watchlist/搜索 → $VAULT/subscription/<平台>/<博主>/ (hot + 按月归档)
+"""
+import importlib
+import json
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+from datetime import datetime, timezone, timedelta
+from pathlib import Path
+
+SKILL_DIR = Path(__file__).resolve().parent.parent
+for _p in (str(SKILL_DIR), str(SKILL_DIR / "common"), str(SKILL_DIR / "tools")):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
+
+from common.registry import is_enabled, can_monitor
+from common.clipboard import canonical_key
+from common.publish_vault import push, push_aggregated_batch
+from common.summarize import summarize
+from pipeline.jobqueue import QueueEngine  # noqa: E402
+
+try:
+    import yaml
+    _cfg = yaml.safe_load((SKILL_DIR / "config.yaml").read_text(encoding="utf-8")) or {}
+except Exception:
+    _cfg = {}
+
+TZ = timezone(timedelta(hours=8))
+
+URL_PLATFORMS = {"bilibili", "douyin", "xiaohongshu", "generic", "wechat"}
+SEARCH_PLATFORMS = {"boss", "jd", "linkedin", "tieba"}
+# 需要 LLM 总结(总结注入 md 顶部)的平台
+SUMMARIZE_PLATFORMS = {"bilibili", "douyin", "generic"}
+# 注 (2026-07-15): 用户关闭了 xhs 的 LLM 总结 — 现在小红书"只爬原文档"
+# OCR + summarize 都跳过了。xhs 仍走 tool fetch → build_note_blocks 推 hot doc.
+
+PLATFORM_LABELS = {
+    "wechat": "微信公众号", "xiaohongshu": "小红书", "bilibili": "B站",
+    "douyin": "抖音", "generic": "通用", "boss": "Boss", "jd": "京东",
+    "linkedin": "领英", "tieba": "贴吧",
+}
+
+
+def detect_platform(url):
+    return canonical_key(url)[0]
+
+
+def _import_tool(plat):
+    return importlib.import_module(f"tools.{plat}")
+
+
+def _yymmdd_now():
+    return datetime.now(TZ).strftime("%y%m%d")
+
+
+
+# ── 队列入口: stage1 (meta + audio_url 抓取) → enqueue TRANSCRIBE ──
+
+async def process_url_meta_queue(url, queue_engine):
+    """阶段 C 入口: 单 URL 抓元数据 + audio_url, 立即 enqueue TRANSCRIBE, 不等转录/总结.
+
+    Returns: (md_path, audio_url) 或 None(失败/跳过).
+    """
+    plat = detect_platform(url)
+    label = PLATFORM_LABELS.get(plat, plat)
+
+    if plat not in ("bilibili", "douyin"):
+        # 暂时只支持 bilibili/douyin (其他平台无 transcript 需求)
+        print(f"  ⏭️  [{label}] 不在 stage1 队列化范围 (clip 路径)")
+        return None
+
+    if not is_enabled(plat):
+        print(f"  ⚠️ [{label}] 工具未启用, 跳过")
+        return None
+    if not can_monitor(plat):
+        print(f"  ⏭️ [{label}] monitor=false, 跳过 watchlist")
+        return None
+
+    # 提取 id + 调 fetcher.process_one_meta
+    import tempfile
+    if plat == "bilibili":
+        from tools.bilibili import extract_bvid, process_one_meta
+        bvid = extract_bvid(url)
+        if not bvid:
+            print(f"  ⏭️ [{label}] 无法提取 bvid: {url[:60]}")
+            return None
+        print(f"\n📥 [{label}] stage1: {bvid}")
+        tmp = tempfile.mkdtemp(prefix="ominicrawl_meta_")
+        try:
+            ret = await process_one_meta(bvid, tmp)
+            if not ret or not ret[2]:
+                print(f"  ⏭️ [{label}] {bvid} 抓元数据失败 (cookie? 网络?)")
+                return None
+            _title, _author, md_path, audio_url = ret
+            # 搬到 notes/<plat>/<author>/
+            from common.paths import notes_dir
+            from common.summarize_markdown import parse_frontmatter
+            fm = parse_frontmatter(md_path) if md_path else {}
+            plat_author = (fm.get("author") or _author or "未分类")
+            plat_dir = notes_dir() / plat / plat_author
+            plat_dir.mkdir(parents=True, exist_ok=True)
+            src_md = Path(md_path)
+            target = plat_dir / src_md.name
+            import shutil
+            shutil.move(str(src_md), str(target))
+            # enqueue
+            jid = queue_engine.enqueue(str(target), "TRANSCRIBE")
+            print(f"   📝 {target.parent.name}/{target.name} → enqueue TRANSCRIBE #{jid}")
+            return str(target), audio_url
+        finally:
+            import shutil
+            shutil.rmtree(tmp, ignore_errors=True)
+    elif plat == "douyin":
+        from tools.douyin import extract_aweme_id, process_one_meta
+        aweme_id = extract_aweme_id(url)
+        if not aweme_id:
+            print(f"  ⏭️ [{label}] 无法提取 aweme_id: {url[:60]}")
+            return None
+        print(f"\n📥 [{label}] stage1: {aweme_id}")
+        tmp = tempfile.mkdtemp(prefix="ominicrawl_meta_")
+        try:
+            ret = await process_one_meta(aweme_id, tmp)
+            if not ret or not ret[2]:
+                print(f"  ⏭️ [{label}] {aweme_id} 抓元数据失败")
+                return None
+            _title, _author, md_path, video_url = ret
+            from common.paths import notes_dir
+            from common.summarize_markdown import parse_frontmatter
+            fm = parse_frontmatter(md_path) if md_path else {}
+            plat_author = (fm.get("author") or _author or "未分类")
+            plat_dir = notes_dir() / plat / plat_author
+            plat_dir.mkdir(parents=True, exist_ok=True)
+            src_md = Path(md_path)
+            target = plat_dir / src_md.name
+            import shutil
+            shutil.move(str(src_md), str(target))
+            jid = queue_engine.enqueue(str(target), "TRANSCRIBE")
+            print(f"   📝 {target.parent.name}/{target.name} → enqueue TRANSCRIBE #{jid}")
+            return str(target), video_url
+        finally:
+            import shutil
+            shutil.rmtree(tmp, ignore_errors=True)
+    return None
+
+
+def run_stage_pool(queue_engine, stage: str, size: int = 3, max_wait_sec: int = 0):
+    """起 size 个 worker 跑指定 stage 的 job, 阻塞直到队列清空 (或超时).
+
+    max_wait_sec=0 表示不限时.
+    Returns: (n_done, n_failed).
+    """
+    from pipeline.jobqueue import start_pool, _make_runner
+    runner = _make_runner(stage, queue_engine)
+    threads = start_pool(queue_engine, stage, runner, size=size)
+    print(f"\n🏃 [{stage}] 起 {size} 个 worker ... (Ctrl+C 强退)")
+
+    import time as _t
+    t0 = _t.time()
+    last_print = 0
+    try:
+        while True:
+            _t.sleep(2)
+            pending = queue_engine.pending_count(stage)
+            if pending == 0:
+                # 再等 5s 看 RUNNING 是否也清空 (跨 stage 间 cooldown)
+                _t.sleep(5)
+                status = queue_engine.status()
+                if status[stage]["PENDING"] == 0 and status[stage]["RUNNING"] == 0:
+                    break
+            if max_wait_sec and _t.time() - t0 > max_wait_sec:
+                print(f"  ⏰ [{stage}] 超过 max_wait_sec={max_wait_sec}s, 退出")
+                break
+            if _t.time() - last_print > 30:
+                status = queue_engine.status()
+                print(f"   [{stage} pool] {status[stage]}", flush=True)
+                last_print = _t.time()
+    except KeyboardInterrupt:
+        print(f"\n⚠️ [{stage}] 收到 KeyboardInterrupt, 等待 worker 收尾 ...")
+
+    elapsed = _t.time() - t0
+    status = queue_engine.status()
+    n_done = status[stage]["DONE"]
+    n_failed = status[stage]["FAILED"]
+    print(f"\n✅ [{stage}] 完成: done={n_done}, failed={n_failed}, 耗时={elapsed:.1f}s")
+    return n_done, n_failed
+
+
+def run_pipeline_pools(queue_engine, stage2_size: int = 3, stage3_size: int = 3):
+    """跑 stage 2 → stage 3 (顺序). 每个 stage 阻塞到队列清空."""
+    print(f"\n{'='*60}")
+    print(f"🏁 阶段 2: TRANSCRIBE pool (workers={stage2_size})")
+    print(f"{'='*60}")
+    d2, f2 = run_stage_pool(queue_engine, "TRANSCRIBE", size=stage2_size)
+
+    print(f"\n{'='*60}")
+    print(f"🤖 阶段 3: SUMMARIZE pool (workers={stage3_size})")
+    print(f"{'='*60}")
+    d3, f3 = run_stage_pool(queue_engine, "SUMMARIZE", size=stage3_size)
+
+    print(f"\n{'='*60}")
+    print(f"📊 总计: TRANSCRIBE done={d2}/failed={f2} | SUMMARIZE done={d3}/failed={f3}")
+    print(f"{'='*60}")
+    return {"transcribe": (d2, f2), "summarize": (d3, f3)}
+
+
+def _summarize_and_insert(obj_token, md_path):
+    """调 summarize.py (GLM 主题-bullet)。
+    仅 bilibili/douyin/generic 走 (xhs 已关闭, 见 SUMMARIZE_PLATFORMS).
+
+    ⚠️ 改动: 旧实现把总结写飞书 docx 顶部, 现注入本地 md 顶部,
+    (H1=博主/H2=文章/H3=要点) 顶部不是汇总的正确落点。
+    现在: 仅打印总结到 stdout 供监控, 后续按博主锚点批量插入。"""
+    try:
+        obj = summarize(md_path)
+    except Exception as e:
+        print(f"   ⚠️ 总结跳过: {e}")
+        return
+    summary = obj.get("summary", "")
+    topics = obj.get("topics", [])
+    if not summary or not topics:
+        print("   ⚠️ 总结 JSON 缺 summary/topics, 跳过")
+        return
+    n_topics = len(topics) if isinstance(topics, list) else 0
+    print(f"   📝 总结完成: 📌 {summary[:30]}... ({n_topics} 条要点)")
+
+
+def process_url(url, dest=None, author=None, title_override=None):
+    """处理单个 URL。dest={"mode","date"}。
+
+    返回 (url, obj) 或 None(跳过/失败)。
+    """
+    dest = dest or {"mode": "clip"}
+    mode = dest.get("mode", "clip")
+    plat = detect_platform(url)
+    label = PLATFORM_LABELS.get(plat, plat)
+
+    if mode == "watchlist" and not can_monitor(plat):
+        print(f"  ⏭️  {label} monitor=false, 跳过 watchlist 监控")
+        return None
+    if not is_enabled(plat):
+        print(f"  ⚠️  {label} 工具未启用 (crawl set-tool 可切换), 跳过")
+        return None
+
+    print(f"\n🌐 [{label}] {url[:80]}")
+    tmp = tempfile.mkdtemp(prefix="ominicrawl_")
+    try:
+        mod = _import_tool(plat)
+        ret = mod.crawl(url, tmp)
+        if len(ret) == 4:
+            title, fetched_author, md, images = ret
+        elif len(ret) == 3:
+            title, md, images = ret
+            fetched_author = None
+        else:
+            raise RuntimeError(f"fetcher 返回值数量异常: {len(ret)}")
+        # B1 fix (2026-07-16): fetcher 返回 (None, None, None, None) 表示跳过
+        # (单条 BV -404/接口拒答), 不要让 Path(None) 炸出 TypeError
+        if title is None or md is None:
+            print(f"   ⏭️  fetcher 主动跳过 (title/md 为 None), 继续下一条")
+            return None
+        if author is None:
+            author = fetched_author
+        if title_override:
+            title = title_override
+        print(f"   📰 {title}")
+        if author:
+            print(f"   ✍️  {author}")
+
+        if mode == "watchlist":
+            # 抓取阶段只写 notes, 发布到 vault 由 finalize_documents 统一走
+            # push_aggregated_batch (hot + monthly 双层). 避免误建"日期·平台" doc.
+            # 关键: 把 md (和 images) 从 tmp 移到 notes/<plat>/<author>/,
+            # 否则 finally 里的 rmtree 会把刚抓的笔记清光.
+            from common.paths import notes_dir, project_root, media_dir
+            from common.summarize_markdown import parse_frontmatter, _as_str
+            md_p = Path(md)
+            fm = parse_frontmatter(md_p)
+            plat_author = (_as_str(fm.get("author")) or author or "未分类")
+            plat_dir = notes_dir() / plat / plat_author
+            plat_dir.mkdir(parents=True, exist_ok=True)
+            target = plat_dir / md_p.name
+            shutil.move(str(md_p), str(target))
+            # images (可能有): 整个 tmp 都搬过来 (images 子目录)
+            if images:
+                try:
+                    if isinstance(images, str):
+                        img_src = Path(images)
+                        if img_src.exists():
+                            img_dst = plat_dir / "images"
+                            if img_dst.exists():
+                                # 同名 note_id 子目录合并
+                                for child in img_src.iterdir():
+                                    dst = img_dst / child.name
+                                    if dst.exists():
+                                        shutil.rmtree(dst, ignore_errors=True) if dst.is_dir() else dst.unlink()
+                                    shutil.move(str(child), str(dst))
+                            else:
+                                shutil.move(str(img_src), str(img_dst))
+                except Exception as e:
+                    print(f"   ⚠️ 移动 images 失败: {e}")
+            print(f"   📝 写 notes: {target}")
+            return str(target), str(target)
+        else:
+            url, obj = push(md, images, title, platform=label, author=author)
+            print(f"   ✅ vault: {url}")
+            if plat in SUMMARIZE_PLATFORMS:
+                _summarize_and_insert(obj, md)
+            return url, obj
+    except Exception as e:
+        print(f"   ❌ 失败: {e}")
+        return None
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def process_search(platform, date_yymmdd=None):
+    """搜索型平台: 跑 crawl_batch → 逐条 push_aggregated_batch (落 vault, 不总结)。"""
+    if platform not in SEARCH_PLATFORMS:
+        raise ValueError(f"process_search 仅支持搜索型平台: {platform}")
+    if not is_enabled(platform):
+        print(f"  ⚠️  {platform} 工具未启用, 跳过")
+        return []
+    date = date_yymmdd or _yymmdd_now()
+    print(f"\n🔎 [{PLATFORM_LABELS.get(platform, platform)}] 搜索抓取 (date={date})")
+    try:
+        mod = _import_tool(platform)
+        results = mod.crawl_batch(date_yymmdd)
+    except Exception as e:
+        print(f"   ❌ 搜索失败: {e}")
+        return []
+    n_written = 0
+    for item in results:
+        # 兼容 3-tuple (title, md_path, images_dir) 和 4-tuple (title, author, md_path, images_dir)
+        if len(item) == 4:
+            title, _author, md, images = item
+        elif len(item) == 3:
+            title, md, images = item
+        else:
+            continue
+        # 抓取阶段只写 notes, 发布到 vault 由 finalize_documents 统一走
+        # push_aggregated_batch (hot + monthly 双层).
+        print(f"   📝 写 notes: {title} → {md}")
+        n_written += 1
+    return [str(r) for r in results]  # 兼容旧调用 (urls 列表没用)
+
+
+# ── watchlist 跑批末尾: 把 notes/ 重读成 items → 推永久 hot+monthly 双层 docx ──
+def load_platform_items_from_notes(plat: str, plat_label: str = None) -> list:
+    """从 notes/<plat>/ 重读全平台历史 → build_note_block → items list.
+
+    既支持博主型目录 notes/<plat>/<blogger>/*.md, 也支持单条型
+    notes/<plat>/*.md (例如 jd/linkedin 搜索型).
+    """
+    from common.paths import notes_dir, project_root, media_dir
+    from common.summarize_markdown import build_note_block, build_note_blocks
+
+    plat_dir = notes_dir() / plat
+    if not plat_dir.exists():
+        return []
+
+    items = []
+    err_count = 0
+    for md_path in plat_dir.rglob("*.md"):
+        # 跳过 _archive / hidden / 旧 push_aggregated 留下的 section.md 缓冲
+        if md_path.name.startswith(".") or md_path.name.startswith("_archive"):
+            continue
+        if md_path.name == "section.md":
+            continue
+        # 过滤旧格式目录（含 "·" 的目录，如 "AI · AI生产力"）
+        # 这些是旧版 xhs-downloader 生成的，title 通常是 "未命名笔记"
+        parts = md_path.parts
+        if any("·" in p for p in parts):
+            continue
+        try:
+            # 跳过 title 为 "未命名笔记" 的旧文件（opencli browser 方案失败残留）
+            from common.summarize_markdown import parse_frontmatter
+            fm = parse_frontmatter(md_path)
+            if (fm.get("title") or "").strip() == "未命名笔记":
+                continue
+            # 用 build_note_blocks (plural): 含职位/结果表格的 notes (linkedin/jd/boss/tieba
+            # 搜索型) 每行解析为独立 item; 其他 1 个文件 1 个 item.
+            blocks = build_note_blocks(md_path)
+            for block in blocks:
+                block["md_path"] = str(md_path)
+                # images_dir: 以 md 文件位置为基准。
+                # 小红书/抖音/B站/京东/领英: 图片在 md 同级 images/<note_id>/ 下，用 md.parent。
+                # 贴吧: 图片在 media/tieba/ 下，用 media_dir() / "tieba"。
+                if plat in ("xiaohongshu", "douyin", "bilibili", "jd", "linkedin", "boss"):
+                    block["images_dir"] = str(md_path.parent)
+                else:  # tieba 等
+                    block["images_dir"] = str(media_dir())
+                items.append(block)
+        except Exception as e:
+            err_count += 1
+            if err_count <= 3:
+                print(f"    ⚠️  {md_path.name}: {e}")
+    return items
+
+
+WATCHLIST_PLATFORMS = ["douyin", "bilibili", "xiaohongshu", "boss", "jd", "linkedin", "tieba"]
+
+
+def _ensure_summaries_for_platform(plat, summary_window_days=30):
+    """对 bilibili/douyin/generic 平台, 给 summary window 内且无 ## 总结 段的 md
+    调 LLM 生成 summary+topics, 注入到 md 末尾. 注入后 build_note_block
+    能从 md 文本里自然读到 core/speedread/quotes, push 阶段无需再注入.
+
+    注意: summary window 是 LLM 注入窗口, 与 publish 阶段的 hot(自然月) 切分
+    是两个独立概念, 不要混用。
+
+    - SUMMARIZE_PLATFORMS 以外的平台直接 return
+    - 已存在 ## 总结 段跳过 (避免重复调 LLM)
+    - 太短 (<100 字正文) 跳过
+    - 单条 LLM 异常不影响整体, 仅打印警告
+
+    Returns: (n_injected, n_skipped, n_err)
+    """
+    if plat not in SUMMARIZE_PLATFORMS:
+        return 0, 0, 0
+    from common.paths import notes_dir, project_root, media_dir
+    from common.summarize import summarize
+    from common.summarize import inject_summary_to_md, has_summary_section
+    from datetime import date, timedelta
+    n_inj = n_skip = n_err = 0
+    cutoff = (date.today() - timedelta(days=summary_window_days)).strftime("%Y%m%d")
+    plat_dir = notes_dir() / plat
+    if not plat_dir.exists():
+        return 0, 0, 0
+    label = PLATFORM_LABELS.get(plat, plat)
+    targets = []
+    for md_path in plat_dir.rglob("*.md"):
+        if md_path.name.startswith(".") or md_path.name.startswith("_archive"):
+            continue
+        if md_path.name == "section.md":
+            continue
+        if any("·" in part for part in md_path.parts):
+            continue
+        # 只补 hot window 内 (避免一次性为上千条历史笔记花 API 钱)
+        # 用文件名首段 yymmdd 粗筛 (格式: 260715-标题.md)
+        import re as _re
+        m = _re.match(r"(\d{6})-", md_path.name)
+        if not m:
+            continue
+        yymmdd = m.group(1)
+        # 转成 YYYYMMDD
+        yyyy = "20" + yymmdd[:2]
+        yyyymmdd = yyyy + yymmdd[2:]
+        if yyyymmdd < cutoff:
+            continue
+        if has_summary_section(md_path):
+            n_skip += 1
+            continue
+        targets.append(md_path)
+    if not targets:
+        return 0, n_skip, 0
+    print(f"  🤖 [{label}] 给 {len(targets)} 篇笔记补 LLM 总结 ...")
+    for md_path in targets:
+        try:
+            obj = summarize(md_path)
+            if inject_summary_to_md(md_path, obj):
+                n_inj += 1
+                print(f"     ✅ {md_path.parent.name}/{md_path.name[:50]}")
+        except Exception as e:
+            n_err += 1
+            if n_err <= 3:
+                print(f"     ⚠️  {md_path.parent.name}/{md_path.name[:50]}: {e}")
+    return n_inj, n_skip, n_err
+
+
+def finalize_documents(platforms=None, summary_window_days: int = 30) -> dict:
+    """watchlist 跑批末尾: 重读 notes → 推永久 hot(当前自然月)+monthly 双层 docx.
+
+    summary_window_days 只用于 LLM 总结注入窗口 (与 hot 切分无关, hot 用自然月).
+    返回 {plat: {"hot": (url, obj), "monthly": {YYYY-MM: (url, obj)}}, ...}
+    """
+    if platforms is None:
+        platforms = WATCHLIST_PLATFORMS
+    print(f"\n📦 finalize: 重新同步永久 docx (hot=当前自然月 + monthly, summary_window={summary_window_days}d)")
+    results = {}
+    for plat in platforms:
+        try:
+            # 先给 hot window 内缺总结的笔记补 LLM 总结 (注入到 md, 自包含)
+            n_inj, n_skip, n_err = _ensure_summaries_for_platform(plat, summary_window_days=summary_window_days)
+            if n_inj or n_skip:
+                print(f"  🤖 [{PLATFORM_LABELS.get(plat, plat)}] 总结补齐: 注入 {n_inj} 篇, 跳过 {n_skip} 篇, 失败 {n_err}")
+            items = load_platform_items_from_notes(plat)
+            if not items:
+                print(f"  ⏭️  {plat}: 无 notes, 跳过")
+                continue
+            n_hot_est = sum(1 for it in items
+                            if (it.get("publish_date") or "").isdigit() and len(it.get("publish_date") or "") == 8)
+            res = push_aggregated_batch(plat, items)
+            n_monthly = len(res["monthly"])
+            results[plat] = res
+            print(f"  ✅ {plat}: hot obj={'已更新' if res['hot'] else 'skip'}, monthly={n_monthly} months, items={len(items)}")
+        except Exception as e:
+            print(f"  ⚠️  {plat}: {e}")
+    return results
+
+
+if __name__ == "__main__":
+    # 自检命令: python run.py <url>
+    if len(sys.argv) > 1:
+        print(process_url(sys.argv[1], {"mode": "clip"}))
+    else:
+        print("URL_PLATFORMS:", URL_PLATFORMS)
+        print("SEARCH_PLATFORMS:", SEARCH_PLATFORMS)

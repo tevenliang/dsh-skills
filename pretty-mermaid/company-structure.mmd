@@ -1,0 +1,16 @@
+flowchart TB
+ subgraph HQ["深圳总部 - 核心研发与管理"]
+        R_Foundation["<b>前瞻研发中心</b><br>大模型训练/端到端算法/世界模型"]
+        H_Hardware["<b>工程中心</b><br>域控制器自研/双目感知模组/车载无人机"]
+        Quality["<b>质量与供应链中心</b><br>车规级供应链/Tier 1 质量体系"]
+  end
+ subgraph Zhuojian["华东中心 - 苏州卓见 (核心子公司)"]
+        Delivery["<b>项目交付部</b><br>对接大众、奇瑞、一汽等车型量产"]
+        System["<b>系统工程部</b><br>系统集成/实车功能验证/路测"]
+        Sales["<b>商务与客户部</b><br>华东市场拓展/售前技术方案"]
+  end
+    Decision["<b>治理层 (股东会/董事会)</b><br>中国一汽 35.8% / 大疆关联方 / 比亚迪等"] --> CEO["<b>CEO 办公室 (沈劭劼)</b><br>战略方向、端到端模型演进"]
+    CEO --> HQ & Zhuojian
+    R_Foundation -.-> Delivery
+    H_Hardware -.-> Delivery
+    H_Hardware --> n1["感知算法部"] & n2["规控部"] & n3["软件系统平台部"] & n4["项目与质量管理"]

@@ -1,0 +1,770 @@
+import sys, os
+_here = os.path.dirname(os.path.abspath(__file__))
+while _here and not os.path.exists(os.path.join(_here, "_bootstrap.py")):
+    _p = os.path.dirname(_here)
+    if _p == _here:
+        _here = None
+        break
+    _here = _p
+if _here:
+    sys.path.insert(0, _here)
+import _bootstrap
+
+#!/usr/bin/env python3
+"""
+publish_vault.py — ominicrawl 发布到 Obsidian vault（替代飞书 push_to_feishu）
+
+【2026-07-21 用户决策: hot 扁平化】
+  - hot 文件: $VAULT/subscription/<平台>-hot.md     (扁平, 易访问)
+  - 历史归档: $VAULT/subscription/<平台>/<YYYYMM><平台>.md  (保留二级目录, 不动)
+  - state key: {platform}-hot (扁平 key)
+
+两条独立发布通道 (2026-07-21 用户决策 — 剪藏 vs 监控 严格分线):
+
+  A) push_aggregated_batch(platform, items)          # watchlist / 搜索型平台
+     落点: $VAULT/subscription/<平台>-hot.md                  # 当前自然月聚合 (1 份/平台, 扁平)
+            $VAULT/subscription/<平台>/<YYYYMM><平台>.md   # 历史按月归档 (如 202606linkedin.md, 保留二级目录)
+     入口: cmd_watchlist (watchlist.md 本地维护) + 搜索型 platform 调用
+     图片: 物化到 $VAULT/media/<h>.<ext>, md 引用改写为 ../../media/<h>.<ext>
+
+  B) push(md_path, images_dir, title, ...)          # 剪藏 (clip) 唯一出口
+     落点: $VAULT/00_inbox/MMDD-<title>.md           # 跟现有 vault 笔记命名一致
+     入口: macOS 备忘录「网页剪藏」(cmd_clip) + 手动 cmd_url 测试
+     图片: 物化到 $VAULT/media/<h>.<ext>, md 引用改写为 media/<h>.<ext> (单层)
+
+  严格禁止混用: clip 不写 subscription/, watchlist 不写 00_inbox/.
+
+
+正文结构复用 summarize_markdown.render_aggregated_markdown(fmt="markdown"):
+  H1 = 日期  →  H2 = 博主  →  H3 = 帖子标题
+    下挂 📅发布·🔗链接 / 🎯一句话核心 / 💡核心金句 / ⏳速读 / 📖正文, 每条以 --- 分隔
+  (按 publish_date DESC → author ASC → title ASC 排序, 同日同博主自动合并)
+
+接口对齐 push_to_feishu.push_aggregated_batch 契约:
+  push_aggregated_batch(platform, items, today: date | None = None) -> {"hot": (url,obj), "monthly": {ym:(url,obj)}}
+  push(md_path, images_dir, title, platform, author, parent=None) -> (url, obj)   # 单条(clip 模式)
+
+双平台 $VAULT 回退: 设环境变量 VAULT 则用; 否则 Linux->/home/ubuntu/webdav/steven_vault, mac->~/Documents/steven_vault
+内容去重: 每 (平台,窗口) 渲染内容哈希, 未变跳过重写（state 存 subscription/.publish_state.json）
+"""
+import os
+import re
+import json
+import hashlib
+from pathlib import Path
+from datetime import date
+
+PLATFORM_LABELS = {
+    "douyin": "抖音", "bilibili": "B站", "xiaohongshu": "小红书",
+    "boss": "Boss直聘", "jd": "京东", "linkedin": "领英", "tieba": "贴吧",
+    "generic": "通用", "wechat": "微信", "link": "链接",
+}
+
+
+def _vault_base() -> Path:
+    env = os.environ.get("VAULT")
+    if env:
+        return Path(env).expanduser()
+    try:
+        sysname = os.uname().sysname
+    except Exception:
+        sysname = "Darwin"
+    if sysname == "Linux":
+        return Path("/home/ubuntu/webdav/steven_vault")
+    return Path.home() / "Documents" / "steven_vault"
+
+
+def _subscription_dir() -> Path:
+    return _vault_base() / "subscription"
+
+
+def _split_hot_monthly(items, today: date | None = None):
+    """按 publish_date 切 hot(当前自然月) / monthly(历史, 按 YYYY-MM 分组). 缺/坏日期归 hot。
+
+    设计：hot 跟自然月绑定 → 跨月自动流入月度归档，不需要额外 rename；
+    同月内 hash 不漂，disk 写次数大幅减少（只在新抓时有变化才写）。
+    """
+    t = today or date.today()
+    cur_ym = (t.year, t.month)
+    hot, monthly = [], {}
+    for it in items:
+        pd = str(it.get("publish_date") or "").strip()
+        if not (len(pd) == 8 and pd.isdigit()):
+            hot.append(it)
+            continue
+        try:
+            d = date(int(pd[:4]), int(pd[4:6]), int(pd[6:8]))
+        except (ValueError, TypeError):
+            hot.append(it)
+            continue
+        if (d.year, d.month) == cur_ym:
+            hot.append(it)
+        else:
+            monthly.setdefault(f"{d.year:04d}-{d.month:02d}", []).append(it)
+    return hot, monthly
+
+
+def _state_path() -> Path:
+    return _subscription_dir() / ".publish_state.json"
+
+
+def _load_state() -> dict:
+    p = _state_path()
+    if p.exists():
+        try:
+            return json.loads(p.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+    return {}
+
+
+def _save_state(d: dict):
+    _subscription_dir().mkdir(parents=True, exist_ok=True)
+    _state_path().write_text(json.dumps(d, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _short_hash(s: str) -> str:
+    return hashlib.md5(s.encode("utf-8")).hexdigest()[:12]
+
+
+# ── 一次性迁移: 旧 hot.md (subscription/<plat>/hot.md → subscription/<plat>-hot.md) ────
+_MIGRATION_DONE = False  # 模块级 flag, 每次进程只跑一次
+
+def _migrate_legacy_hot():
+    """把 vault/subscription/<plat>/hot.md 移到 vault/subscription/<plat>-hot.md,
+    并清理 .publish_state.json 里旧的 "<plat>/hot" key。
+
+    触发背景 (2026-07-21 用户决策 — hot 扁平化):
+      - 旧落点 subscription/<plat>/hot.md 改成扁平 subscription/<plat>-hot.md
+      - 旧 state key "<plat>/hot" 改成新扁平 key "<plat>-hot"
+      - 历史月度归档 subscription/<plat>/<YYYYMM><plat>.md 不动 (用户原话保留)
+
+    设计: 幂等 + 一次性
+      - 仅在新文件不存在 + 旧文件存在时迁移 (不会覆盖)
+      - 同一进程内只跑一次 (模块级 flag, 避免每次 push 都扫描)
+      - 任何异常都 fallback 静默 (迁移失败不该阻塞发布主流程)
+    """
+    global _MIGRATION_DONE
+    if _MIGRATION_DONE:
+        return
+    _MIGRATION_DONE = True
+    try:
+        sub = _subscription_dir()
+        if not sub.exists():
+            return
+        # 1) 文件迁移
+        moved = []
+        for plat_dir in sub.iterdir():
+            if not plat_dir.is_dir():
+                continue
+            plat = plat_dir.name
+            old = plat_dir / "hot.md"
+            new = sub / f"{plat}-hot.md"
+            if old.exists() and not new.exists():
+                try:
+                    old.rename(new)
+                    moved.append(plat)
+                except Exception:
+                    pass
+        # 2) state 旧 key 清理 (避免下次启动时重复触发)
+        state = _load_state()
+        legacy_keys = [k for k in list(state.keys()) if k.endswith("/hot") and "/" in k]
+        for k in legacy_keys:
+            state.pop(k, None)
+        if legacy_keys:
+            _save_state(state)
+        if moved:
+            print(f"  🔄 一次性迁移 hot.md: {moved} → subscription/<plat>-hot.md (扁平)")
+            if legacy_keys:
+                print(f"     同步清理旧 state key: {len(legacy_keys)} 个 (e.g. {legacy_keys[:3]})")
+    except Exception:
+        pass  # 迁移失败不阻塞发布
+
+
+# ── 图片物化 ─────────────────────────────────────────────────
+# 2026-07-20: 把每个 item 的 images 物理复制到 <vault>/media/<hash>.<ext>,
+# 在 image_refs[i].path 里改写为 vault 相对路径 "../../media/<hash>.<ext>",
+# 这样无论 item 是放在 hot.md 还是按月归档里, Obsidian 都能找到图.
+
+MEDIA_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".mp4", ".mov"}
+
+
+def _materialize_item_images(items: list[dict]) -> tuple[list[dict], dict]:
+    """对每个 item:
+       1) 物理复制 images 到 <vault>/media/<hash>.<ext> (按内容 hash, 幂等)
+       2) 改写 image_refs[i].path = "../../media/<hash>.<ext>" (vault 相对)
+       3) item.images_dir 缺失/找不到图 → 计入 skipped + 写 warning (不再静默吞)
+
+    返回 (items, stats)，stats 供调用方/测试断言，杜绝"静默 0 上传":
+       {"expected": 需物化数, "materialized": 实落盘数,
+        "already": 已物化跳过数, "skipped": 跳过数, "warnings": [...]}
+    """
+    media_root = _vault_base() / "media"
+    media_root.mkdir(parents=True, exist_ok=True)
+    stats = {"expected": 0, "materialized": 0, "already": 0, "skipped": 0, "warnings": []}
+    for it in items:
+        refs = it.get("image_refs") or []
+        if not refs:
+            continue
+        images_dir_str = it.get("images_dir")
+        images_dir = Path(images_dir_str) if images_dir_str else None
+        item_ok = 0
+        for ref in refs:
+            rel = ref.get("path") or ""
+            # 跳过已经物化过的 (旧格式 ../../../media/<hash>.<ext> 或 vault 内部)
+            if rel.startswith("../../../media/") or rel.startswith("../../media/") or rel == "media/":
+                stats["already"] += 1
+                continue
+            stats["expected"] += 1
+            # 解析源文件: <images_dir>/<rel>  或  <images_dir>/<rel basename>
+            src = None
+            if images_dir:
+                cand = images_dir / rel
+                if cand.exists():
+                    src = cand
+                else:
+                    cand2 = images_dir / Path(rel).name
+                    if cand2.exists():
+                        src = cand2
+            if not src:
+                stats["skipped"] += 1
+                stats["warnings"].append(
+                    f"图源未找到: item={it.get('title','?')!r} rel={rel!r} images_dir={images_dir_str!r}")
+                continue
+            ext = src.suffix.lower() or ".png"
+            try:
+                data = src.read_bytes()
+            except Exception as e:
+                stats["skipped"] += 1
+                stats["warnings"].append(f"读图失败: {src}: {e}")
+                continue
+            h = hashlib.md5(data).hexdigest()[:24]
+            dst = media_root / f"{h}{ext}"
+            if not dst.exists():
+                try:
+                    import shutil as _sh
+                    _sh.copy2(src, dst)
+                except Exception as e:
+                    stats["skipped"] += 1
+                    stats["warnings"].append(f"图复制失败: {src} -> {dst}: {e}")
+                    continue
+            ref["path"] = f"../../media/{h}{ext}"
+            stats["materialized"] += 1
+            item_ok += 1
+        # ⚠️ 护栏: 声明了图却 0 张物化 → 显式告警 (防 0 上传静默)
+        if refs and item_ok == 0:
+            stats["warnings"].append(
+                f"⚠️ 条目 {it.get('title','?')!r} 声明了 {len(refs)} 张图但 0 张物化成功（图片丢失风险）")
+    # 汇总打印 (可观测)
+    if stats["expected"] or stats["materialized"] or stats["already"]:
+        tail = ""
+        if stats["already"] or stats["skipped"]:
+            tail = f"（已存在 {stats['already']}，跳过 {stats['skipped']}）"
+        print(f"  📎 物化 {stats['materialized']}/{stats['expected']} 张图到 {media_root}{tail}")
+    for w in stats["warnings"]:
+        print("  ⚠️", w)
+    return items, stats
+
+
+def _render(items) -> str:
+    """复用 summarize_markdown 的聚合渲染 (H1日期/H2博主/H3标题), markdown 输出。"""
+    from common.summarize_markdown import render_aggregated_markdown
+    return render_aggregated_markdown(items, fmt="markdown").strip() + "\n"
+
+
+def push_aggregated_batch(platform, items, today: date | None = None):
+    """整平台永久型发布到 vault — 平台级 hot (当前自然月) + 按月归档。
+
+    落点 (2026-07-21 用户决策 - 扁平化):
+      - hot: $VAULT/subscription/<平台>-hot.md          (扁平, 如 douyin-hot.md)
+      - 月度归档: $VAULT/subscription/<平台>/<YYYYMM><平台>.md (保留二级目录, 如 douyin/202606douyin.md)
+    hot 范围 = 当月 (current calendar month); 月度归档 = 历史非当月, 按 YYYY-MM 分组;
+    缺/坏日期归 hot (保守)。
+    参数/返回对齐 push_to_feishu.push_aggregated_batch。
+    """
+    plat_label = PLATFORM_LABELS.get(platform, platform)
+    # 2026-07-21: 一次性迁移旧 hot.md + state key (扁平化收尾)
+    _migrate_legacy_hot()
+    items_hot, items_monthly = _split_hot_monthly(items, today=today)
+    # 2026-07-20: 物化 images 到 vault/media + 改写路径 (hot+monthly 都用同一份)
+    # 2026-07-21: 接收 stats, 物化异常/0 上传会显式告警 (阶段2 P0 修复)
+    items_hot, _ = _materialize_item_images(items_hot)
+    for m_items in items_monthly.values():
+        m_items, _ = _materialize_item_images(m_items)
+    result = {"hot": None, "monthly": {}}
+    state = _load_state()
+    sub_dir = _subscription_dir()
+    # monthly 归档仍走二级目录 (按用户原话保留不动)
+    monthly_dir = sub_dir / platform
+    monthly_dir.mkdir(parents=True, exist_ok=True)
+
+    # hot.md 扁平化 (2026-07-21): $VAULT/subscription/<平台>-hot.md
+    # state key 同步改为 "{platform}-hot" (避免跟旧 "/hot" 冲突)
+    if items_hot:
+        fp = sub_dir / f"{platform}-hot.md"
+        content = _render(items_hot)
+        key = f"{platform}-hot"
+        h = _short_hash(content)
+        if state.get(key) == h and fp.exists():
+            print(f"  ⏭️  hot: {plat_label} ({len(items_hot)}条) 未变, 跳过")
+        else:
+            fp.write_text(content, encoding="utf-8")
+            state[key] = h
+            print(f"✅ hot: {plat_label} ({len(items_hot)}条, 当前月) → {fp.name}")
+        result["hot"] = (str(fp), str(fp))
+
+    # 按月归档 <YYYYMM><平台>.md (保留二级目录, 如 douyin/202606douyin.md)
+    for ym in sorted(items_monthly.keys()):
+        m_items = items_monthly[ym]
+        fname = f"{ym.replace('-', '')}{platform}.md"   # 例: 202606linkedin.md
+        fp = monthly_dir / fname
+        content = _render(m_items)
+        key = f"{platform}/{ym}"
+        h = _short_hash(content)
+        if state.get(key) == h and fp.exists():
+            print(f"  ⏭️  monthly: {plat_label} {fname} ({len(m_items)}条) 未变, 跳过")
+        else:
+            fp.write_text(content, encoding="utf-8")
+            state[key] = h
+            print(f"✅ monthly: {plat_label} {fname} ({len(m_items)}条)")
+        result["monthly"][ym] = (str(fp), str(fp))
+
+    _save_state(state)
+    return result
+
+
+
+# ── 增量追加单条到 hot.md (2026-07-22, 替代 notes/ 中间目录) ──
+# watchlist 模式: 每条抓完直接追加到 hot.md，不用 notes/ → finalize 两段流程
+# 去重: 按 source_url 检查 hot.md 中是否已有该帖子
+
+def _frontmatter(text: str) -> dict:
+    """从 md 文本解析 YAML frontmatter，返回 {key: value}。"""
+    if not text.startswith("---\n"):
+        return {}
+    end = text.find("\n---\n", 4)
+    if end < 0:
+        return {}
+    import yaml as _yaml
+    try:
+        return _yaml.safe_load(text[4:end]) or {}
+    except Exception:
+        return {}
+
+
+def _strip_frontmatter_body(text: str) -> str:
+    """去掉 frontmatter，返回正文。"""
+    if not text.startswith("---\n"):
+        return text
+    end = text.find("\n---\n", 4)
+    if end < 0:
+        return text
+    return text[end + 6:]
+
+
+def _extract_source_url(md_path: Path) -> str:
+    """从 md frontmatter 抽取 source_url。"""
+    try:
+        text = md_path.read_text(encoding="utf-8", errors="replace")
+    except Exception:
+        return ""
+    fm = _frontmatter(text)
+    url = fm.get("source_url") or fm.get("url") or ""
+    if not url:
+        import re as _re
+        m = _re.search(r"https?://\S+", text)
+        if m:
+            url = m.group(0)
+    return url.strip()
+
+
+def _body_paragraphs(md_path: Path) -> list:
+    """返回正文段落列表（去掉 frontmatter + metadata）。"""
+    try:
+        text = _strip_frontmatter_body(md_path.read_text(encoding="utf-8", errors="replace"))
+    except Exception:
+        return []
+    lines = text.splitlines()
+    paras = []
+    for ln in lines:
+        ln = ln.strip()
+        if not ln:
+            continue
+        if ln.startswith("#") or ln.startswith("**") or ln.startswith("---") or ln.startswith("🔗") or ln.startswith("📅"):
+            continue
+        paras.append(ln)
+    return paras
+
+
+def _materialize_images_v2(images_dir: Path, item_body_lines: list) -> tuple:
+    """复制 images_dir 下所有图片到 vault/media/<hash>.<ext>，
+    改写 item_body_lines 中的图片引用，返回改写后的行列表。
+
+    images_dir: 可为 None 或不存在（跳过图片处理）。
+    返回 (改写后行列表, {"materialized": N})。
+    """
+    stats = {"materialized": 0}
+    if not images_dir or not images_dir.exists():
+        return item_body_lines, stats
+    media_root = _vault_base() / "media"
+    media_root.mkdir(parents=True, exist_ok=True)
+    import shutil as _sh
+    img_files = [p for p in images_dir.rglob("*") if p.is_file() and p.suffix.lower() in MEDIA_EXTS]
+    if not img_files:
+        return item_body_lines, stats
+    # 构建 media 目录已有文件的 hash→path 映射（用于匹配已物化的旧文件）
+    existing_hashes = {}
+    if media_root.exists():
+        for mf in media_root.iterdir():
+            if mf.is_file():
+                stem = mf.stem
+                ext = mf.suffix.lower()
+                if len(stem) >= 16:
+                    existing_hashes[stem] = f"media/{stem}{ext}"
+
+    name_map = {}
+    for img in img_files:
+        ext = img.suffix.lower()
+        try:
+            h = hashlib.md5(img.read_bytes()).hexdigest()[:24]
+        except Exception:
+            continue
+        dst = media_root / f"{h}{ext}"
+        if not dst.exists():
+            try:
+                _sh.copy2(img, dst)
+            except Exception:
+                continue
+        name_map[img.name] = f"media/{h}{ext}"
+        stats["materialized"] += 1
+
+    if not name_map and not existing_hashes:
+        return item_body_lines, stats
+
+    import re as _re
+    def _rewire(m):
+        alt = m.group(1) or ""
+        name = m.group(2)
+        # 先尝试原始文件名映射（新增文件）
+        new_path = name_map.get(name)
+        if new_path:
+            return f"![{alt}]({new_path})"
+        # 再用已有 hash 映射（已物化的旧文件，文件名已是 hash）
+        new_path = existing_hashes.get(name)
+        if new_path:
+            return f"![{alt}]({new_path})"
+        return m.group(0)
+    new_lines = []
+    for ln in item_body_lines:
+        ln2 = _re.sub(r"!\[([^[\]]*)\]\(images\/([^)]+)\)", _rewire, ln)
+        new_lines.append(ln2)
+    return new_lines, stats
+
+
+
+
+def _frontmatter(text: str) -> dict:
+    """从 md 文本解析 YAML frontmatter，返回 {key: value}。"""
+    if not text.startswith("---\n"):
+        return {}
+    end = text.find("\n---\n", 4)
+    if end < 0:
+        return {}
+    import yaml as _yaml
+    try:
+        return _yaml.safe_load(text[4:end]) or {}
+    except Exception:
+        return {}
+
+
+def _strip_frontmatter_body(text: str) -> str:
+    """去掉 frontmatter，返回正文。"""
+    if not text.startswith("---\n"):
+        return text
+    end = text.find("\n---\n", 4)
+    if end < 0:
+        return text
+    return text[end + 6:]
+
+
+def _extract_source_url(md_path: Path) -> str:
+    """从 md frontmatter 抽取 source_url。"""
+    try:
+        text = md_path.read_text(encoding="utf-8", errors="replace")
+    except Exception:
+        return ""
+    fm = _frontmatter(text)
+    url = fm.get("source_url") or fm.get("url") or ""
+    # 从正文中也尝试找第一个 URL
+    if not url:
+        import re as _re
+        m = _re.search(r"https?://\S+", text)
+        if m:
+            url = m.group(0)
+    return url.strip()
+
+
+def _body_paragraphs(md_path: Path) -> list:
+    """返回正文段落列表（去掉 frontmatter + metadata）。"""
+    try:
+        text = _strip_frontmatter_body(md_path.read_text(encoding="utf-8", errors="replace"))
+    except Exception:
+        return []
+    lines = text.splitlines()
+    paras = []
+    for ln in lines:
+        ln = ln.strip()
+        if not ln:
+            continue
+        # 跳过 metadata 行
+        if ln.startswith("#") or ln.startswith("**") or ln.startswith("---") or ln.startswith("🔗") or ln.startswith("📅"):
+            continue
+        paras.append(ln)
+    return paras
+
+
+def append_single_to_hot(platform: str, md_path: str | Path, images_dir: str | Path = None,
+                        title: str = None, author: str = None) -> tuple:
+    """将单条帖子增量追加到 vault hot.md。
+
+    替换原 notes/ → finalize_documents → push_aggregated_batch 链路，
+    每条抓完直接追加，去重靠 source_url 检查 hot.md 中已有的 URL。
+
+    落点:
+      hot: $VAULT/subscription/<平台>-hot.md (当月)
+      月归档: $VAULT/subscription/<平台>/<YYYYMM><平台>.md (历史月份)
+
+    返回 (hot_fp, hot_fp) 格式兼容原 process_url 返回值。
+    """
+    md_p = Path(md_path)
+    images_p = Path(images_dir) if images_dir else None
+
+    # 1. 读 frontmatter，构建 item dict
+    try:
+        text = md_p.read_text(encoding="utf-8", errors="replace")
+    except Exception as e:
+        raise RuntimeError(f"无法读取 md: {md_p}: {e}")
+    fm = _frontmatter(text)
+    source_url = _extract_source_url(md_p)
+    item_title = (fm.get("title") or title or md_p.stem or "(无标题)").strip()
+    item_author = (fm.get("author") or author or "未知作者").strip()
+    # 兼容所有日期格式字段（yaml 会自动把 YYYY-MM-DD 转成 datetime，需要转回字符串）
+    def _to_str(v):
+        if hasattr(v, 'strftime'):
+            return v.strftime('%Y-%m-%d')
+        return str(v).strip()
+    raw_date = (
+        _to_str(fm.get("publish_time_raw") or "")
+        or _to_str(fm.get("publish_time") or "")
+        or _to_str(fm.get("publish_date") or "")
+        or _to_str(fm.get("created") or "")
+    )
+    # 兼容: 2026-07-21_20:58:20 (小红书) / 2026-07-21T20:58:20 (B站) / 2026-07-21 (通用) / 20260721
+    m2 = re.search(r"(\d{4})[\-_\sT月年](\d{2})[\-_\sT月](\d{2})", raw_date)
+    if m2:
+        publish_date = m2.group(1) + m2.group(2) + m2.group(3)
+    elif len(raw_date) == 8 and raw_date.isdigit():
+        publish_date = raw_date
+    else:
+        publish_date = ""
+
+    # 2. 提取正文段落
+    body_lines = _body_paragraphs(md_p)
+
+    # 3. 物化图片（复制到 vault/media，改写引用）
+    img_stats = {"materialized": 0}
+    if images_p and images_p.exists():
+        body_lines, img_stats = _materialize_images_v2(images_p, body_lines)
+        if img_stats["materialized"]:
+            print(f"  📎 物化 {img_stats['materialized']} 张图到 vault/media")
+
+    item = {
+        "title": item_title,
+        "author": item_author,
+        "publish_date": publish_date,
+        "source_url": source_url,
+        "body_paragraphs": body_lines,
+    }
+
+    # 4. 追加到 hot.md（去重）
+    sub_dir = _subscription_dir()
+    sub_dir.mkdir(parents=True, exist_ok=True)
+    hot_fp = sub_dir / f"{platform}-hot.md"
+
+    state = _load_state()
+    seen_key = f"_seen_urls_{platform}"
+    seen_urls = set(state.get(seen_key, []))
+    state_file_key = f"{platform}-hot"
+
+    if source_url and source_url in seen_urls:
+        print(f"  ⏭️  [{item_author}] {item_title[:40]}... (已存在, 跳过)")
+        return (str(hot_fp), str(hot_fp))
+
+    if hot_fp.exists():
+        try:
+            existing = hot_fp.read_text(encoding="utf-8")
+            urls_in_file = set(re.findall(r"https?://\S+", existing))
+            if source_url and source_url in urls_in_file:
+                print(f"  ⏭️  [{item_author}] {item_title[:40]}... (hot.md 中已存在, 跳过)")
+                seen_urls.add(source_url)
+                state[seen_key] = list(seen_urls)
+                _save_state(state)
+                return (str(hot_fp), str(hot_fp))
+        except Exception:
+            pass
+
+    from common.summarize_markdown import render_aggregated_markdown
+    new_md = render_aggregated_markdown([item], fmt="markdown").strip() + "\n\n---\n"
+
+    if hot_fp.exists():
+        existing = hot_fp.read_text(encoding="utf-8")
+        if existing.rstrip().endswith("---"):
+            existing = existing.rstrip()[:-4].strip()
+        content = existing + "\n\n" + new_md
+    else:
+        content = new_md
+
+    hot_fp.write_text(content, encoding="utf-8")
+    if source_url:
+        seen_urls.add(source_url)
+        state[seen_key] = list(seen_urls)
+    state[state_file_key] = _short_hash(content)
+    _save_state(state)
+
+    print(f"  ✅ [{item_author}] {item_title[:50]} → {hot_fp.name}")
+    return (str(hot_fp), str(hot_fp))
+
+
+def push(md_path, images_dir, title, platform="link", author=None, parent=None):
+    """单条发布 (clip 模式) — 唯一出口 = vault/00_inbox/ + vault/media/。
+
+    设计 (2026-07-21 用户决策):
+      - 剪藏入口唯一 = macOS 备忘录「网页剪藏」(cmd_clip)
+      - 剪藏出口唯一 = $VAULT/00_inbox/MMDD-<title>.md
+      - 图片唯一去点 = $VAULT/media/<md5>.<ext> (按内容 hash 物化, 幂等)
+      - md 引用改写: ![](images/X) → ![](media/<h>.<ext>)  (vault 根相对, Obsidian 直读)
+      - 不再写 subscription/<平台>/<标题>.md (旧 hot/monthly 是 watchlist 用, 不动)
+
+    返回 (url, obj) 对齐 push_to_feishu 契约, 给 cmd_clip / cmd_url 用。
+    """
+    plat_label = PLATFORM_LABELS.get(platform, platform)
+    vault = _vault_base()
+    inbox = vault / "00_inbox"
+    media_root = vault / "media"
+    inbox.mkdir(parents=True, exist_ok=True)
+    media_root.mkdir(parents=True, exist_ok=True)
+
+    src = Path(md_path)
+    content = src.read_text(encoding="utf-8", errors="replace") if src.exists() else f"# {title}\n"
+
+    # ── 抓取质量门 (2026-07-21 用户决策) ──
+    # 风控/失效页会得到 fallback 标题 + 空正文, 拒绝落 inbox 避免垃圾污染。
+    # process_url 已经会 catch 这个异常并 return None, cmd_clip 不会删备忘录行。
+    FALLBACK_TITLES = {"wechat-article", "untitled", "微信公众号", ""}
+    title_strip = (title or "").strip()
+    body_chars = len(content.strip())
+    body_stripped = re.sub(r"^#.*$|^\*\*作者\*\*.*$|^\*\*原文链接\*\*.*$|^\*\*抓取时间\*\*.*$|^---+$", "", content, flags=re.M).strip()
+    body_only_chars = len(body_stripped)
+    if title_strip.lower() in FALLBACK_TITLES or body_only_chars < 200:
+        raise RuntimeError(
+            f"抓取疑似失败 (质量门): title={title_strip!r} 正文={body_only_chars}字, 拒绝落 inbox"
+        )
+
+    # 文件名: MMDD-<safe-title>.md (跟 vault/00_inbox 现有笔记命名一致)
+    mmdd = date.today().strftime("%m%d")
+    safe = re.sub(r'[\\/:*?"<>|\r\n\t]', "_", title).strip()[:60].rstrip("._") or "untitled"
+    base = f"{mmdd}-{safe}.md"
+    fp = inbox / base
+    # 防撞: 同日同名, 加 _2/_3 后缀
+    n = 2
+    while fp.exists():
+        fp = inbox / f"{mmdd}-{safe}_{n}.md"
+        n += 1
+
+    # 图片物化: images_dir (tmp_dir 或 tmp_dir/images) 下的所有图 → vault/media/<h>.<ext>
+    # md 里 ![](images/<name>) → ![](media/<h>.<ext>)  (按文件 basename 匹配)
+    img_src_dir = Path(images_dir) if images_dir else None
+    if img_src_dir and img_src_dir.exists():
+        import shutil as _sh
+        img_files = [p for p in img_src_dir.rglob("*")
+                     if p.is_file() and p.suffix.lower() in MEDIA_EXTS]
+        if img_files:
+            name_map = {}  # basename → vault 相对路径 "media/<h>.<ext>"
+            for img in img_files:
+                ext = img.suffix.lower()
+                try:
+                    h = hashlib.md5(img.read_bytes()).hexdigest()[:24]
+                except Exception:
+                    continue
+                dst = media_root / f"{h}{ext}"
+                if not dst.exists():
+                    try:
+                        _sh.copy2(img, dst)
+                    except Exception:
+                        continue
+                name_map[img.name] = f"media/{h}{ext}"
+            # 改写 md 引用: ![alt](images/<name>) → ![alt](media/<h>.<ext>)
+            def _rewire(m):
+                alt = m.group(1) or ""
+                name = m.group(2)
+                new = name_map.get(name)
+                return f"![{alt}]({new})" if new else m.group(0)
+            new_content = re.sub(r"!\[([^\]]*)\]\(images/([^)]+)\)", _rewire, content)
+
+            # 改写 HTML img 标签: <img ... src="images/<name>" ... alt="..."> → ![alt](media/<h>.<ext>)
+            # 兼容微信 wechat_kernel_main.py 输出格式 (wechat 文章常用此格式)
+            def _rewire_html(m):
+                tag = m.group(0)
+                name = m.group(1)
+                new = name_map.get(name)
+                if not new:
+                    return tag
+                alt_m = re.search(r'\salt="([^"]*)"', tag)
+                alt = alt_m.group(1) if alt_m else ""
+                return f"![{alt}]({new})" if alt else f"![]({new})"
+            new_content = re.sub(
+                r'<img\s+[^>]*src="images/([^"]+)"[^>]*/?>',
+                _rewire_html, new_content
+            )
+
+            n_rewired = content.count("images/") - new_content.count("images/")
+            content = new_content
+            print(f"  📎 物化 {len(name_map)} 张图 → {media_root}, md 引用改写 {n_rewired} 处")
+        else:
+            # ⚠️ 护栏: md 里声明了 images/ 引用却在该目录找不到任何图 → 告警 (防静默 0 上传)
+            if "images/" in content:
+                print(f"  ⚠️ 剪藏声明了图片引用 (images/) 但 {img_src_dir} 下未找到任何图（图片丢失风险）")
+
+    fp.write_text(content, encoding="utf-8")
+    print(f"✅ push: {plat_label}/{fp.name} (→ vault/00_inbox/)")
+    return (str(fp), str(fp))
+
+
+if __name__ == "__main__":
+    import argparse, json as _json
+    ap = argparse.ArgumentParser(description="common-publish: 发布 item 到 vault")
+    ap.add_argument("--self-test", action="store_true", help="跑图片断言测试 (test_publish.py)")
+    ap.add_argument("--item", help="item JSON 文件 (aggregated 模式读取)")
+    ap.add_argument("--platform", default="testplat")
+    ap.add_argument("--mode", choices=["aggregated", "clip"], default="aggregated")
+    ap.add_argument("--md", help="clip 模式: 源 md 路径")
+    ap.add_argument("--images-dir", help="clip 模式: 图片目录")
+    ap.add_argument("--title", default="test")
+    args = ap.parse_args()
+
+    if args.self_test:
+        import subprocess, sys
+        _test = Path(__file__).resolve().parent / "test_publish.py"
+        raise SystemExit(subprocess.run([sys.executable, str(_test)]).returncode)
+
+    if args.item:
+        _it = _json.loads(Path(args.item).read_text(encoding="utf-8"))
+        _its = _it if isinstance(_it, list) else [_it]
+        if args.mode == "aggregated":
+            print("OK", push_aggregated_batch(args.platform, _its))
+        else:
+            print("OK", push(args.md, args.images_dir, args.title, platform=args.platform))
+    else:
+        print("vault_base     :", _vault_base())
+        print("subscription   :", _subscription_dir())
+        print("\n用法: python publish_vault.py --self-test | --item item.json [--mode aggregated|clip]")

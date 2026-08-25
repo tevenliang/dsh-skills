@@ -1,0 +1,531 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+import json, os, re, shutil, subprocess, datetime, time
+from pathlib import Path
+
+BASE = Path(__file__).resolve().parent
+INBOX = BASE / "ocr_inbox"
+PROC = BASE / "processing_ocr"
+VAULT = Path(os.environ.get("VAULT", "/home/ubuntu/webdav/steven_vault"))
+REPORT_DIR = VAULT / "04_agent" / "report"
+POLL = 30
+PY = BASE / "venv" / "bin" / "python3"
+TZ_OFFSET = 8
+
+_rapid_ocr = None
+_rapid_ocr_lock_fd = None  # 共享模型加载锁
+
+def _wait_for_model_lock():
+    """等 ASR 的 FunASR 加载完毕后再加载 RapidOCR"""
+    import os, time, fcntl
+    LOCK_PATH = "/tmp/model-loading.lock"
+    waited = 0
+    while os.path.exists(LOCK_PATH) and waited < 1800:
+        time.sleep(5)
+        waited += 5
+        print(f"[ocr] 等 FunASR 释放模型锁 ... {waited}s", flush=True)
+    if waited >= 1800:
+        print("[ocr] WARNING: 等锁超时，继续加载 RapidOCR", flush=True)
+
+def _get_rapid_ocr():
+    global _rapid_ocr, _rapid_ocr_lock_fd
+    if _rapid_ocr is not None:
+        return _rapid_ocr
+
+    # ── 等 ASR 的 FunASR 加载完毕再加载 RapidOCR ──
+    _wait_for_model_lock()
+
+    import os, time, fcntl
+    LOCK_PATH = "/tmp/model-loading.lock"
+    LOCK_DIR = os.path.dirname(LOCK_PATH)
+    os.makedirs(LOCK_DIR, exist_ok=True)
+    fd = os.open(LOCK_PATH, os.O_CREAT | os.O_RDWR, 0o644)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        os.write(fd, f"{os.getpid()}".encode())
+        _rapid_ocr_lock_fd = fd
+    except (IOError, OSError):
+        os.close(fd)
+        _rapid_ocr_lock_fd = None
+
+    try:
+        from rapidocr_onnxruntime import RapidOCR
+        _rapid_ocr = RapidOCR()
+        print("[ocr] RapidOCR 加载成功!", flush=True)
+    finally:
+        # 加载完立即释放锁
+        if _rapid_ocr_lock_fd is not None:
+            try:
+                fcntl.flock(_rapid_ocr_lock_fd, fcntl.LOCK_UN)
+                os.close(_rapid_ocr_lock_fd)
+                try: os.unlink(LOCK_PATH)
+                except FileNotFoundError: pass
+            except Exception: pass
+            _rapid_ocr_lock_fd = None
+        print("[ocr] 已释放模型加载锁", flush=True)
+
+    return _rapid_ocr
+
+def _run_rapidocr(img_path: Path) -> str:
+    try:
+        ocr = _get_rapid_ocr()
+        result, elapse = ocr(str(img_path))
+        if not result:
+            return "[无文字]"
+        sorted_lines = sorted(result, key=lambda x: x[0][0][1])
+        texts = [item[1].strip() for item in sorted_lines if item[1].strip()]
+        combined = '\n'.join(texts)
+        return combined if combined else "[无文字]"
+    except Exception as e:
+        return f"[OCR错误: {e}]"
+
+def _detect_table_lines(result) -> bool:
+    """改用行密度判断：y坐标聚类行数>=3 且每行平均>=1.5个文本块"""
+    if not result or len(result) < 3:
+        return False
+    y_centers = []
+    for item in result:
+        box = item[0]
+        y1, y2 = box[0][1], box[2][1]
+        y_centers.append((y1 + y2) / 2)
+    y_centers = sorted(y_centers)
+    if len(y_centers) < 3:
+        return False
+    lines = 1
+    for i in range(1, len(y_centers)):
+        if y_centers[i] - y_centers[i-1] > 15:
+            lines += 1
+    if lines < 3:
+        return False
+    return len(result) / lines >= 1.5
+
+def _format_as_table(result) -> str:
+    """改进版表格格式化：用x坐标间隙分析检测列边界，再按行分组"""
+    if not result:
+        return ""
+
+    # Step 1: 提取每个cell的坐标信息
+    cell_x_pairs = []
+    for item in result:
+        box = item[0]
+        text = item[1].strip()
+        if not text:
+            continue
+        x1, y1 = box[0][0], box[0][1]
+        x2, y2 = box[1][0], box[1][1]
+        x_left = min(x1, x2)
+        x_right = max(x1, x2)
+        y_center = (y1 + y2) / 2
+        cell_x_pairs.append((x_left, x_right, y_center, text))
+
+    if not cell_x_pairs:
+        return ""
+
+    # Step 2: 动态y阈值
+    all_y = sorted(set(y for _, _, y, _ in cell_x_pairs))
+    if len(all_y) >= 2:
+        y_gaps = sorted([all_y[i+1] - all_y[i] for i in range(len(all_y)-1)])
+        non_zero = [g for g in y_gaps if g > 1]
+        if non_zero:
+            y_threshold = max(non_zero[0] * 1.5, 12)
+        else:
+            y_threshold = 12
+    else:
+        y_threshold = 12
+
+    # Step 3: 分行
+    rows_raw = []
+    current_row = []
+    current_y = None
+    for x_left, x_right, y_center, text in cell_x_pairs:
+        if current_y is None or abs(y_center - current_y) < y_threshold:
+            current_row.append((x_left, x_right, y_center, text))
+            current_y = y_center
+        else:
+            rows_raw.append(sorted(current_row, key=lambda t: t[2]))  # sort by x_center
+            current_row = [(x_left, x_right, y_center, text)]
+            current_y = y_center
+    if current_row:
+        rows_raw.append(sorted(current_row, key=lambda t: t[2]))
+
+    if not rows_raw:
+        return ""
+
+    # Step 4: 确定列数
+    num_cols = max(len(row) for row in rows_raw)
+    num_cols = max(num_cols, 2)
+
+    # Step 5: 构建列边界（基于所有x_left的聚类）
+    all_x_lefts = sorted(set(x_left for row in rows_raw for x_left, _, _, _ in row))
+    boundaries = [0]
+    if len(all_x_lefts) >= 2:
+        gaps = [(all_x_lefts[i+1] - all_x_lefts[i], (all_x_lefts[i] + all_x_lefts[i+1]) / 2)
+                for i in range(len(all_x_lefts)-1)]
+        if gaps:
+            avg_gap = sum(g[0] for g in gaps) / len(gaps)
+            threshold = max(avg_gap * 2.5, 25)
+            for gap, mid in gaps:
+                if gap >= threshold:
+                    boundaries.append(mid)
+    boundaries.append(99999)
+
+    # 补齐列边界
+    while len(boundaries) - 1 < num_cols:
+        last = boundaries[-1]
+        prev = boundaries[-2]
+        boundaries.insert(-1, (prev + last) / 2)
+
+    # Step 6: 将cell分配到正确列
+    table_rows = []
+    for row in rows_raw:
+        cells = [""] * num_cols
+        for x_left, x_right, y_center, text in row:
+            col_idx = 0
+            for i in range(len(boundaries) - 1):
+                if x_left < boundaries[i+1]:
+                    col_idx = i
+                    break
+            col_idx = min(col_idx, num_cols - 1)
+            cells[col_idx] = text
+        table_rows.append(cells)
+
+    # Step 7: 生成 Markdown
+    md_lines = []
+    for cells in table_rows:
+        md_lines.append('| ' + ' | '.join(cells) + ' |')
+    if len(table_rows) > 1:
+        md_lines.insert(1, '| ' + ' | '.join(['---'] * num_cols) + ' |')
+    return '\n'.join(md_lines)
+
+def _llm_format_table(rapidocr_result, api_key):
+    """用 LLM 将 RapidOCR 结果结构化为 Markdown 表格（复杂/合并单元格）"""
+    if not rapidocr_result or not api_key:
+        return None
+    blocks = []
+    for item in rapidocr_result:
+        box, text, score = item[0], item[1].strip(), item[2]
+        if not text:
+            continue
+        x1, y1 = box[0][0], box[0][1]
+        x2, y2 = box[1][0], box[1][1]
+        blocks.append({"text": text, "x": (x1+x2)/2, "y": (y1+y2)/2})
+    if len(blocks) < 4:
+        return None
+    y_vals = sorted(set(b["y"] for b in blocks))
+    def y_to_row(y):
+        for i in range(len(y_vals)-1):
+            if y < (y_vals[i] + y_vals[i+1]) / 2:
+                return i
+        return len(y_vals)-1
+    for b in blocks:
+        b["row"] = y_to_row(b["y"])
+    rows_data = {}
+    for b in blocks:
+        rows_data.setdefault(b["row"], {})[b["x"]] = b["text"]
+    col_header = " | ".join(["col" + str(i) for i in range(10)])
+    lines_text = "\n".join(
+        " | ".join(rows_data[r].get(x, "-") for x in sorted(rows_data[r]))
+        for r in sorted(rows_data)
+    )
+    prompt = (
+        "你是一个基金表格提取专家。以下是从图片OCR提取的文字块，x坐标表示列位置，y坐标表示行位置。"
+        "表格列通常包括：主题、博主、近一年|持仓、操作、份额(基金名称)、金额(如5k/1w/3k/8k等)。\n"
+        "请将这些文字块重组为标准Markdown表格，保留所有列包括操作列(+)和金额列。输出仅表格，无需解释。\n\n"
+        + lines_text
+    )
+    try:
+        import urllib.request, json
+        # 使用传入的 api_key（优先），失败则用智谱免费 key
+        effective_key = api_key if api_key else "5f2dff3b8e61c05cc5caf0818043952b.QsBeF38rMtfFZibh"
+        data = json.dumps({
+            "model": "glm-4-flash",
+            "messages": [{"role": "user", "content": prompt}],
+            "max_tokens": 1024,
+            "temperature": 0.1
+        }).encode("utf-8")
+        req = urllib.request.Request(
+            "https://open.bigmodel.cn/api/paas/v4/chat/completions",
+            data=data,
+            headers={"Authorization": "Bearer " + effective_key, "Content-Type": "application/json"}
+        )
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            result = json.loads(resp.read())
+            return result["choices"][0]["message"]["content"].strip()
+    except Exception as e:
+        print("LLM table failed: " + str(e), flush=True)
+        return None
+
+
+
+
+
+
+# 百炼视觉模型池（有免费额度的模型，按顺序尝试，额度耗尽自动切换下一个）
+BAILIAN_VISION_MODELS = [
+    "qwen3-vl-flash",
+    "qwen-vl-max",
+    "qwen-vl-plus",
+    "qwen2.5-vl-72b-instruct",
+    "qwen-vl-ocr",
+    "qwen-vl-ocr-latest",
+]
+_bailian_model_idx = 0  # 当前使用的模型索引
+
+def _get_bailian_key():
+    api_key = os.environ.get('BAILIAN_API_KEY', '')
+    if not api_key:
+        try:
+            cfg = json.load(open(Path.home() / '.bailian' / 'config.json'))
+            api_key = cfg.get('api_key', '')
+        except Exception:
+            pass
+    return api_key
+
+def _bailian_vision_ocr(img_path):
+    """用百炼视觉模型池识别图片，额度耗尽自动切换下一个模型"""
+    global _bailian_model_idx
+    import base64, urllib.request
+    api_key = _get_bailian_key()
+    if not api_key:
+        return None
+    ext = img_path.suffix.lower().lstrip('.')
+    mime = {'png': 'image/png', 'jpg': 'image/jpeg', 'jpeg': 'image/jpeg',
+            'webp': 'image/webp', 'gif': 'image/gif'}.get(ext, 'image/png')
+    b64 = base64.b64encode(img_path.read_bytes()).decode()
+    prompt = (
+        "这是一张基金操作表格图片。请把图片中的表格完整提取为Markdown表格，"
+        "保留所有列（包括主题、博主、近一年、持仓、操作、名称、份额），"
+        "不要遗漏任何列和行，不要添加解释，只输出表格。"
+        "如果不是表格，请提取所有可见文字。"
+    )
+    
+    # 依次尝试模型池中的模型
+    for attempt in range(len(BAILIAN_VISION_MODELS)):
+        idx = (_bailian_model_idx + attempt) % len(BAILIAN_VISION_MODELS)
+        model = BAILIAN_VISION_MODELS[idx]
+        data = json.dumps({
+            "model": model,
+            "messages": [{"role": "user", "content": [
+                {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}},
+                {"type": "text", "text": prompt}
+            ]}],
+            "max_tokens": 4096,
+            "temperature": 0.1
+        }).encode("utf-8")
+        req = urllib.request.Request(
+            "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
+            data=data,
+            headers={"Authorization": "Bearer " + api_key, "Content-Type": "application/json"}
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=60) as resp:
+                result = json.loads(resp.read())
+                content = result["choices"][0]["message"]["content"].strip()
+                content = re.sub(r'^```(?:markdown)?\s*\n?', '', content)
+                content = re.sub(r'\n?```\s*$', '', content)
+                if content:
+                    _bailian_model_idx = idx  # 记住成功的模型
+                    print(f"     Bailian {model}: {len(content)} chars", flush=True)
+                    return content
+        except urllib.error.HTTPError as e:
+            body = e.read().decode('utf-8', errors='replace')
+            if 'insufficient_quota' in body or '403' in str(e.code):
+                print(f"     {model} 额度耗尽，切换下一个模型...", flush=True)
+                continue
+            else:
+                print(f"     Bailian {model} error: {e.code} {body[:200]}", flush=True)
+                continue
+        except Exception as e:
+            print(f"     Bailian {model} error: {e}", flush=True)
+            continue
+    
+    print("     所有百炼模型均不可用", flush=True)
+    return None
+
+def process_one(note_dir: Path) -> tuple:
+    note_id = note_dir.name
+    meta_file = note_dir / f"{note_id}.meta.json"
+    if not meta_file.exists():
+        print(f'  WARNING {note_id}: meta.json 不存在', flush=True)
+        return False, 0, note_id
+    try:
+        meta = json.loads(meta_file.read_text(encoding='utf-8'))
+    except Exception as e:
+        print(f'  WARNING {note_id}: meta.json 解析失败: {e}', flush=True)
+        return False, 0, note_id
+
+    author = meta.get('author', '未知作者')
+    title = meta.get('title', note_id)
+    platform = meta.get('platform', 'xiaohongshu')
+    source_url = meta.get('source_url', '')
+    publish_date = meta.get('publish_date', '')
+    note_id_val = meta.get('note_id', note_id)
+
+    # 从 vault 直接读 md，从 wikilink 找图片路径
+    import glob as _glob, subprocess as _sp
+    # 文件名是人类可读标题，note_id 只存在于 frontmatter source_url -> 改用内容检索定位 md
+    _grep = _sp.run(['grep', '-rl', '--include=*.md', note_id,
+                     str(VAULT / 'subscription' / 'xiaohongshu')],
+                    capture_output=True, text=True, timeout=30)
+    _md_candidates = [l.strip() for l in _grep.stdout.splitlines() if l.strip()]
+    if not _md_candidates:
+        print(f'  WARNING {note_id}: vault 中未找到 md 文件', flush=True)
+        return False, 0, note_id
+    _actual_md_path = Path(_md_candidates[0])
+    md_text = _actual_md_path.read_text(encoding='utf-8', errors='replace')
+    # 防重复：已有 OCR 结果则跳过
+    if '> [!info] OCR' in md_text:
+        print(f'  SKIP {note_id}: vault 中已有 OCR，跳过', flush=True)
+        return True, 0, note_id
+
+    wikilink_to_img = {}
+    for wl_match in re.finditer(r'!\[\[([^\]]+)\]\]', md_text):
+        wl_path = wl_match.group(1)
+        if any(wl_path.endswith(ext) for ext in ['.png', '.jpg', '.jpeg', '.gif', '.webp']):
+            img_path = VAULT / wl_path
+            if img_path.exists():
+                wikilink_to_img[wl_match.group(0)] = img_path
+
+    ocr_texts = []
+    replaced_count = 0
+    for old_link, img in wikilink_to_img.items():
+        print(f'  IMG OCR {img.name} ...', flush=True)
+        # 2026-08-25: 优先用百炼 qwen3-vl-flash 视觉直调，跳过 RapidOCR
+        bl_result = _bailian_vision_ocr(img)
+        if bl_result and '|' in bl_result:
+            ocr_text = bl_result
+            format_tag = 'Bailian视觉'
+            print(f'     Bailian视觉: {len(bl_result)} chars, 表格模式', flush=True)
+        else:
+            try:
+                ocr_engine = _get_rapid_ocr()
+                raw_result, elapse = ocr_engine(str(img))
+                _el = sum(elapse) if isinstance(elapse, list) else elapse
+                print(f'     RapidOCR fallback: {len(raw_result) if raw_result else 0} items, total={_el*1000:.0f}ms', flush=True)
+                result = raw_result
+            except Exception as e:
+                print(f'     RapidOCR 异常: {e}', flush=True)
+                result = None
+
+            is_table = _detect_table_lines(result)
+            if is_table and result:
+                ocr_text = _format_as_table(result)
+                format_tag = '表格'
+                import os as _os
+                api_key = _os.environ.get('OCR_LLM_API_KEY', '')
+                if not api_key:
+                    api_key = '5f2dff3b8e61c05cc5caf0818043952b.QsBeF38rMtfFZibh'
+                llm_result = _llm_format_table(result, api_key)
+                if llm_result and '|' in llm_result:
+                    ocr_text = llm_result
+                    format_tag = '表格(LLM)'
+            elif result:
+                sorted_lines = sorted(result, key=lambda x: x[0][0][1])
+                texts = [item[1].strip() for item in sorted_lines if item[1].strip()]
+                ocr_text = '\n'.join(texts)
+                format_tag = '文本'
+            else:
+                ocr_text = _run_rapidocr(img)
+                format_tag = '文本'
+
+        ocr_texts.append(ocr_text)
+        print(f'     识别模式: {format_tag}, 字符数: {len(ocr_text)}', flush=True)
+
+        def _to_quote(t):
+            lines = t.split('\n')
+            return '\n'.join(f'> {ln}' if ln.strip() else '>' for ln in lines)
+
+        if '|' in ocr_text:
+            quote_block = f'\n> [!info] OCR 表格识别 [{img.name}]:\n{ocr_text}\n'
+        else:
+            quote_block = f'\n> [!info] OCR 识别({format_tag}) [{img.name}]:\n{_to_quote(ocr_text)}\n'
+
+        quote_pat = re.compile(
+            r'\n> \[!info\] OCR.*?\s*\[?(?:表格|文本|Bailian视觉|表格\(LLM\))\]?\s*\[?' + re.escape(img.name) + r'\]?:\n((?:>.*\n?)*)',
+            flags=re.MULTILINE
+        )
+        md_text = quote_pat.sub('', md_text)
+
+        if old_link in md_text:
+            md_text = md_text.replace(old_link, f'{old_link}{quote_block}')
+            replaced_count += 1
+            print(f'     OK {img.name} replaced', flush=True)
+        else:
+            print(f'     WARNING wikilink not in md: {old_link}', flush=True)
+
+    total_chars = sum(len(t) for t in ocr_texts)
+    if replaced_count == 0:
+        print(f'  WARNING replaced_count=0, skip publish_vault', flush=True)
+        return False, total_chars, note_id
+
+    import tempfile
+    tmp = tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False, encoding='utf-8')
+    tmp.write(md_text)
+    tmp.close()
+
+    try:
+        sys_path = str(BASE)
+        import sys
+        if sys_path not in sys.path:
+            sys.path.insert(0, sys_path)
+        from publish_vault import append_single_to_hot
+        fpath, info = append_single_to_hot(platform, tmp.name, title=title, author=author, force_overwrite=True)
+        if fpath:
+            print(f'  OK {note_id} -> vault ({total_chars} chars)', flush=True)
+            # 2026-08-24: write marker so Mac can pull later
+            # Format: platform:note_id (e.g., xiaohongshu:6a8be1be0000)
+            try:
+                with open(BASE / '.last_ocr_note', 'w') as _f:
+                    _f.write(platform + ':' + note_id + chr(10))
+            except Exception:
+                pass
+        else:
+            print(f'  WARNING publish_vault returned empty', flush=True)
+    except Exception as e:
+        print(f'  WARNING publish_vault failed: {e}', flush=True)
+        return False, total_chars, note_id
+    finally:
+        Path(tmp.name).unlink(missing_ok=True)
+
+    return True, total_chars, note_id
+
+def write_receipt(note_id: str, success: bool, chars: int, elapsed: float):
+    today = datetime.date.today().strftime('%Y%m%d')
+    report_path = REPORT_DIR / f'crawl_op_ocr_{today}.md'
+    now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    line = f"- `{now}` `{note_id}` {'OK' if success else 'FAIL'} {chars} chars ({elapsed:.1f}s)\n"
+    header = f'# crawl_op_ocr_{today}\n\n'
+    if not report_path.exists():
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path.write_text(header, encoding='utf-8')
+    content = report_path.read_text(encoding='utf-8')
+    report_path.write_text(content + line, encoding='utf-8')
+
+def main():
+    print('[ocr] ocr_daemon 启动 (Bailian qwen3-vl-flash + RapidOCR fallback)', flush=True)
+    INBOX.mkdir(parents=True, exist_ok=True)
+    REPORT_DIR.mkdir(parents=True, exist_ok=True)
+
+    while True:
+        note_dirs = sorted([
+            d for d in INBOX.iterdir()
+            if d.is_dir() and not d.name.startswith('.')
+        ])
+        if note_dirs:
+            print(f'[ocr] 发现 {len(note_dirs)} 个待处理', flush=True)
+        for note_dir in note_dirs:
+            t0 = time.time()
+            print(f'[ocr] 处理 {note_dir.name}/ ...', flush=True)
+            ok, chars, nid = process_one(note_dir)
+            elapsed = time.time() - t0
+            write_receipt(nid, ok, chars, elapsed)
+            try:
+                shutil.rmtree(note_dir)
+                print(f'  cleanup {nid}/\n', flush=True)
+            except Exception as e:
+                print(f'  cleanup failed: {e}\n', flush=True)
+        time.sleep(POLL)
+
+if __name__ == '__main__':
+    main()
+

@@ -1,0 +1,576 @@
+import sys, os
+_here = os.path.dirname(os.path.abspath(__file__))
+while _here and not os.path.exists(os.path.join(_here, "_bootstrap.py")):
+    _p = os.path.dirname(_here)
+    if _p == _here:
+        _here = None
+        break
+    _here = _p
+if _here:
+    sys.path.insert(0, _here)
+import _bootstrap
+
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+pipeline/jobqueue.py — SQLite-backed job queue + worker pool (阶段 C, 2026-07-20)
+
+设计:
+- 单文件 SQLite 库 (WAL 模式, 支持并发读 + 单写)
+- jobs 表: id, md_path, stage, status, enqueued_at, started_at, finished_at, worker_id, error
+- status: PENDING / RUNNING / DONE / FAILED
+- stage: TRANSCRIBE / SUMMARIZE  (FETCH 阶段是同步的, 不入队)
+- 进程崩溃恢复: recover_orphans() 把 RUNNING 超过 N 分钟的 job 改回 PENDING
+
+线程模型:
+- worker_pool(stage, size, runner) 起 size 个 daemon thread, 持续 claim PENDING -> runner -> mark done/failed
+- runner 是 callable(job_row) -> None, 抛异常即 FAILED
+
+对外 API:
+- QueueEngine(path=DEFAULT_PATH)
+  - enqueue(md_path, stage) -> job_id
+  - claim_next(stage, worker_id) -> job_row | None
+  - mark_done(job_id)
+  - mark_failed(job_id, error)
+  - recover_orphans(older_than_sec=300)
+  - status() -> dict (各 stage 的 pending/running/done/failed 数)
+
+CLI:
+  python pipeline/jobqueue.py status
+  python pipeline/jobqueue.py recover
+  python pipeline/jobqueue.py enqueue <md_path> <stage>
+  python pipeline/jobqueue.py run-pool <stage> [--size N]   # 测试用
+"""
+import argparse
+import json
+import os
+import sqlite3
+import sys
+import threading
+import time
+import traceback
+from pathlib import Path
+from typing import Callable, Optional
+
+# \u8def\u5f84: \u8ba9 pipeline/jobqueue.py \u80fd\u76f4\u63a5\u8dd1\u4e5f\u80fd import
+SKILL_DIR = Path(__file__).resolve().parent.parent
+if str(SKILL_DIR) not in sys.path:
+    sys.path.insert(0, str(SKILL_DIR))
+
+DEFAULT_PATH = SKILL_DIR / "state" / "queue.sqlite"
+
+SCHEMA = """
+CREATE TABLE IF NOT EXISTS jobs (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    md_path     TEXT    NOT NULL,
+    stage       TEXT    NOT NULL CHECK (stage IN ('TRANSCRIBE', 'SUMMARIZE')),
+    status      TEXT    NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'RUNNING', 'DONE', 'FAILED')),
+    enqueued_at REAL    NOT NULL,
+    started_at  REAL,
+    finished_at REAL,
+    worker_id   TEXT,
+    error       TEXT,
+    payload     TEXT    -- JSON: extra metadata (audio_url, model hints, etc.)
+);
+CREATE INDEX IF NOT EXISTS idx_jobs_stage_status ON jobs(stage, status, enqueued_at);
+CREATE INDEX IF NOT EXISTS idx_jobs_md ON jobs(md_path);
+"""
+
+_STAGES = ("TRANSCRIBE", "SUMMARIZE")
+_STATUSES = ("PENDING", "RUNNING", "DONE", "FAILED")
+
+
+class QueueEngine:
+    """SQLite-backed job queue. Thread-safe (sqlite3 check_same_thread=False + lock for write)."""
+
+    def __init__(self, path: Path | str = DEFAULT_PATH):
+        self.path = Path(path)
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self._lock = threading.Lock()  # serialize writes (sqlite3 is thread-safe but write contention hurts)
+        self._local = threading.local()  # per-thread connection
+        self._init_schema()
+
+    def _conn(self) -> sqlite3.Connection:
+        # one connection per thread (sqlite3 is not safe across threads by default)
+        conn = getattr(self._local, "conn", None)
+        if conn is None:
+            conn = sqlite3.connect(str(self.path), timeout=30, isolation_level=None, check_same_thread=False)
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA synchronous=NORMAL")
+            conn.row_factory = sqlite3.Row
+            self._local.conn = conn
+        return conn
+
+    def _init_schema(self):
+        with self._lock:
+            conn = self._conn()
+            conn.executescript(SCHEMA)
+
+    def enqueue(self, md_path: str, stage: str, payload: dict | None = None) -> int:
+        if stage not in _STAGES:
+            raise ValueError(f"stage \u5fc5\u987b\u662f {_STAGES} \u4e4b\u4e00, \u6536\u5230 {stage!r}")
+        with self._lock:
+            cur = self._conn().execute(
+                "INSERT INTO jobs (md_path, stage, status, enqueued_at, payload) VALUES (?, ?, 'PENDING', ?, ?)",
+                (str(md_path), stage, time.time(), json.dumps(payload or {}, ensure_ascii=False)),
+            )
+            return cur.lastrowid
+
+    def claim_next(self, stage: str, worker_id: str) -> Optional[sqlite3.Row]:
+        """\u539f\u5b50\u6027\u62a2\u4e00\u4e2a PENDING job, \u7acb\u5373\u6807\u8bb0\u4e3a RUNNING. \u8fd4\u56de\u884c\u6216 None."""
+        with self._lock:
+            cur = self._conn().execute(
+                """UPDATE jobs
+                   SET status='RUNNING', started_at=?, worker_id=?
+                   WHERE id = (
+                       SELECT id FROM jobs
+                       WHERE stage=? AND status='PENDING'
+                       ORDER BY enqueued_at ASC
+                       LIMIT 1
+                   )
+                   RETURNING *""",
+                (time.time(), worker_id, stage),
+            )
+            row = cur.fetchone()
+            return row
+
+    def mark_done(self, job_id: int):
+        with self._lock:
+            self._conn().execute(
+                "UPDATE jobs SET status='DONE', finished_at=? WHERE id=?",
+                (time.time(), job_id),
+            )
+
+    def mark_failed(self, job_id: int, error: str):
+        with self._lock:
+            self._conn().execute(
+                "UPDATE jobs SET status='FAILED', finished_at=?, error=? WHERE id=?",
+                (time.time(), str(error)[:1000], job_id),
+            )
+
+    def recover_orphans(self, older_than_sec: int = 300) -> int:
+        """\u628a RUNNING \u8d85\u8fc7 older_than_sec \u79d2\u7684 job \u91cd\u7f6e\u4e3a PENDING (\u8fdb\u7a0b\u5d29\u6e83\u540e\u91cd\u542f\u7528).
+        \u8fd4\u56de\u91cd\u7f6e\u6570\u91cf.
+        """
+        threshold = time.time() - older_than_sec
+        with self._lock:
+            cur = self._conn().execute(
+                "UPDATE jobs SET status='PENDING', worker_id=NULL, started_at=NULL WHERE status='RUNNING' AND started_at < ?",
+                (threshold,),
+            )
+            return cur.rowcount
+
+    def status(self) -> dict:
+        with self._lock:
+            cur = self._conn().execute(
+                "SELECT stage, status, COUNT(*) AS n FROM jobs GROUP BY stage, status"
+            )
+            rows = cur.fetchall()
+        out = {stage: {s: 0 for s in _STATUSES} for stage in _STAGES}
+        out["TOTAL"] = 0
+        for r in rows:
+            out[r["stage"]][r["status"]] = r["n"]
+            out["TOTAL"] += r["n"]
+        return out
+
+    def pending_count(self, stage: str) -> int:
+        with self._lock:
+            cur = self._conn().execute(
+                "SELECT COUNT(*) AS n FROM jobs WHERE stage=? AND status='PENDING'", (stage,)
+            )
+            return cur.fetchone()["n"]
+
+
+# \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+# Worker pool (\u7ed9 stage 2/3 runner \u7528)
+# \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+
+
+def _run_worker(engine: QueueEngine, stage: str, worker_id: str, runner: Callable[[sqlite3.Row], None],
+                poll_interval: float = 1.0, idle_sleep: float = 2.0):
+    """\u5355\u4e2a worker thread \u4e3b\u5faa\u73af. \u4e0d\u8d62\u9000: \u53ea\u6709 KeyboardInterrupt \u624d\u9000.
+    runner(job_row) -> None; \u629b\u5f02\u5e38\u5219 mark_failed.
+    """
+    print(f"  [worker {worker_id}] \u542f\u52a8 ({stage})", flush=True)
+    while True:
+        try:
+            row = engine.claim_next(stage, worker_id)
+            if row is None:
+                time.sleep(idle_sleep)
+                continue
+            try:
+                runner(row)
+                engine.mark_done(row["id"])
+            except Exception as e:
+                tb = traceback.format_exc(limit=3)
+                print(f"  [worker {worker_id}] job #{row['id']} \u5931\u8d25: {e}", flush=True)
+                engine.mark_failed(row["id"], tb)
+        except KeyboardInterrupt:
+            print(f"  [worker {worker_id}] \u6536\u5230 KeyboardInterrupt, \u9000\u51fa", flush=True)
+            return
+        except Exception as e:
+            print(f"  [worker {worker_id}] \u4e3b\u5faa\u73af\u9519\u8bef: {e}", flush=True)
+            time.sleep(poll_interval)
+
+
+def start_pool(engine: QueueEngine, stage: str, runner: Callable, size: int = 3) -> list[threading.Thread]:
+    """\u8d77 size \u4e2a daemon worker thread. \u8fd4\u56de thread \u5bf9\u8c61 (\u8c03\u7528\u8005 .join() \u7b49\u5f85).
+    daemon=True \u4fdd\u8bc1\u4e3b\u8fdb\u7a0b\u9000\u51fa\u65f6 worker \u4e00\u8d77\u9000.
+    """
+    threads = []
+    for i in range(size):
+        wid = f"{stage}-{i:02d}"
+        t = threading.Thread(target=_run_worker, args=(engine, stage, wid, runner), daemon=True, name=f"qworker-{wid}")
+        t.start()
+        threads.append(t)
+    return threads
+
+
+# \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+# Default runners (stage 2 / stage 3)
+# \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+
+
+def _read_md_frontmatter(md_path: str) -> dict:
+    """\u8bfb\u53d6 md \u7684 frontmatter (\u7b80\u5355 key:value \u89e3\u6790). \u8fd4\u56de dict."""
+    p = Path(md_path)
+    if not p.exists():
+        return {}
+    text = p.read_text(encoding="utf-8")
+    if not text.startswith("---"):
+        return {}
+    import re
+    m = re.search(r"^---\n(.*?)\n---", text, re.S)
+    if not m:
+        return {}
+    out = {}
+    for line in m.group(1).splitlines():
+        mm = re.match(r"^([A-Za-z_][A-Za-z0-9_]*):\s*(.*)$", line)
+        if mm:
+            out[mm.group(1)] = mm.group(2).strip().strip('"').strip("'")
+    return out
+
+
+
+def _detect_platform_from_path(md_path: str) -> str:
+    """从 md_path 推断平台 (notes/<plat>/...). 空表示未知."""
+    p = Path(md_path)
+    for part in p.parts:
+        if part in ("bilibili", "douyin", "xiaohongshu", "wechat", "generic", "boss", "jd", "linkedin", "tieba"):
+            return part
+    return ""
+
+
+def _build_download_headers(platform: str, audio_url: str) -> dict:
+    """按平台构造下载 headers (bilibili 用 cookie, douyin 用 x-bogus)."""
+    if platform == "bilibili":
+        try:
+            sys.path.insert(0, str(SKILL_DIR / "bilibili"))
+            from bili_feed import _load_bili_cookie
+            cookie = _load_bili_cookie()
+            return {
+                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+                "Referer": "https://www.bilibili.com/",
+                "Cookie": cookie,
+            }
+        except Exception as e:
+            print(f"  [headers] bilibili cookie 加载失败: {e}", flush=True)
+            return {"User-Agent": "Mozilla/5.0", "Referer": "https://www.bilibili.com/"}
+    if platform == "douyin":
+        # 抖音直连 url 已含签名参数, ua+referer 即可
+        return {
+            "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15",
+            "Referer": "https://www.douyin.com/",
+        }
+    return {}
+
+
+# --- ASR provider round-robin helpers (job-level) ---
+import threading as _thr, json as _json
+
+_TRANSCRIBE_PROVIDERS = ["bailian", "groq", "xfyun", "mlx"]  # job-id mod 4, 讯飞仅 <60s
+_GROQ_KEY = None
+
+def _groq_key():
+    global _GROQ_KEY
+    if _GROQ_KEY:
+        return _GROQ_KEY
+    for p in [SKILL_DIR.parent.parent / "credentials/ominicrawl/groq.json",
+              SKILL_DIR.parent.parent / "credentials/ominicrawl/groq.json"]:
+        if p.exists():
+            try:
+                _GROQ_KEY = _json.loads(p.read_text()).get("api_key", "")
+                break
+            except Exception:
+                pass
+    return _GROQ_KEY or ""
+
+_XFYUN_CREDS = None
+
+def _xfyun_creds():
+    """加载讯飞凭证，优先从环境变量读，兜底从 credential 文件读。"""
+    global _XFYUN_CREDS
+    if _XFYUN_CREDS is not None:
+        return _XFYUN_CREDS
+    # 先查环境变量
+    appid = os.environ.get("XFYUN_APPID", "")
+    apikey = os.environ.get("XFYUN_APIKEY", "")
+    apisecret = os.environ.get("XFYUN_APISECRET", "")
+    if appid and apikey and apisecret:
+        _XFYUN_CREDS = {"appid": appid, "apikey": apikey, "apisecret": apisecret}
+        return _XFYUN_CREDS
+    # 兜底 credential 文件
+    for p in [SKILL_DIR.parent.parent / "credentials/ominicrawl/xfyun.json",
+              Path.home() / ".agents/credentials/ominicrawl/xfyun.json"]:
+        if p.exists():
+            try:
+                data = _json.loads(p.read_text())
+                _XFYUN_CREDS = {
+                    "appid": data.get("appid", ""),
+                    "apikey": data.get("apikey", ""),
+                    "apisecret": data.get("apisecret", ""),
+                }
+                if _XFYUN_CREDS["appid"]:
+                    return _XFYUN_CREDS
+            except Exception:
+                pass
+    return {"appid": "", "apikey": "", "apisecret": ""}
+
+def _next_provider(job_id, dur_s):
+    """按 job_id mod N 选 provider, groq 仅用于 <60s 音频."""
+    idx = int(job_id or 0) % len(_TRANSCRIBE_PROVIDERS)
+    p = _TRANSCRIBE_PROVIDERS[idx]
+    if p == "groq" and dur_s >= 60:
+        p = "bailian"
+    if p == "xfyun" and dur_s >= 60:
+        p = "bailian"   # xfyun 单段上限 60s
+    return p
+
+
+def runner_transcribe(job_row, *, queue_engine=None):
+    """stage 2 runner: audio_url -> ASR (bailian/groq/mlx 轮转) -> apply_transcript.
+    用户设计: job[n]->bailian, job[n+1]->groq, job[n+2]->bailian (job 级别 round-robin).
+    worker 持续 work-stealing, 完成后自动 enqueue SUMMARIZE job.
+    """
+    import os, yaml, tempfile
+    from common.transcribe import (
+        transcribe_bailian_async,
+        transcribe_local_async,
+        apply_transcript,
+    )
+    # 讯飞脚本
+    _xfyun_script = SKILL_DIR.parent / "xfyun-iat" / "scripts" / "xfyun_iat.py"
+
+    md_path   = job_row["md_path"]
+    fm        = _read_md_frontmatter(md_path)
+    audio_url = fm.get("audio_url", "")
+    dur_s     = int(fm.get("duration") or 0)
+
+    if not audio_url:
+        print(f"  [transcribe] {md_path} no audio_url, enqueue SUMMARIZE", flush=True)
+        if queue_engine is not None:
+            queue_engine.enqueue(md_path, "SUMMARIZE")
+        return
+
+    provider = _next_provider(job_row["id"], dur_s)
+    print(f"  [transcribe] {os.path.basename(md_path)} provider={provider} ({dur_s}s)", flush=True)
+
+    wav_path = None
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
+            wav_path = f.name
+
+        from common.transcribe import extract_audio_to_wav
+        platform = fm.get("category", "") or _detect_platform_from_path(md_path)
+        hdrs     = _build_download_headers(platform, audio_url)
+        ok       = extract_audio_to_wav(audio_url, wav_path, headers=hdrs)
+        if not ok:
+            raise RuntimeError(f"audio_to_wav failed: {audio_url[:80]}")
+
+        cfg = yaml.safe_load((SKILL_DIR / "config.yaml").read_text()) if (SKILL_DIR / "config.yaml").exists() else {}
+        bailian_model = cfg.get("transcription", {}).get("bailian", {}).get("model", "paraformer-8k-v2")
+        gkey = _groq_key()
+        text_out = ""
+        source   = provider
+        done     = False
+
+        # -- Primary ASR ----------------------------------------
+        if provider == "bailian":
+            res = transcribe_bailian_async(wav_path, model=bailian_model,
+                                          language="zh", audio_secs=dur_s,
+                                          soft_timeout=300, max_retry=1)
+            if res.get("status") == "SUCCEEDED" and res.get("text"):
+                text_out = res["text"]
+                source   = res.get("model", "bailian")
+                done     = True
+                print(f"  [transcribe] bailian OK {len(text_out)} chars", flush=True)
+            else:
+                print(f"  [transcribe] bailian FAILED({res.get('status')})", flush=True)
+
+        if not done and provider == "groq" and gkey:
+            from common.transcribe import transcribe_groq
+            txt = transcribe_groq(wav_path, gkey, "whisper-large-v3-turbo")
+            if txt:
+                text_out = txt
+                source   = "groq"
+                done     = True
+                print(f"  [transcribe] groq OK {len(text_out)} chars", flush=True)
+            else:
+                print(f"  [transcribe] groq FAILED", flush=True)
+
+        if not done and provider == "xfyun":
+            import sys as _sys
+            if _xfyun_script.exists():
+                _sys.path.insert(0, str(_xfyun_script.parent))
+                try:
+                    _xf = _xfyun_creds()
+                    if not _xf.get("appid"):
+                        print(f"  [transcribe] xfyun 凭证未配置 (appid 为空)，跳过", flush=True)
+                    else:
+                        _xf_env = {
+                            "XFYUN_APPID":    _xf["appid"],
+                            "XFYUN_APIKEY":   _xf["apikey"],
+                            "XFYUN_APISECRET": _xf["apisecret"],
+                        }
+                        import subprocess as _sub
+                        _env = dict(os.environ); _env.update(_xf_env)
+                        _res = _sub.run(
+                            [_sys.executable, str(_xfyun_script), wav_path, "--auto-resample", "--chunk-seconds", "50"],
+                            capture_output=True, text=True, timeout=120, env=_env
+                        )
+                        if _res.returncode == 0 and _res.stdout.strip():
+                            text_out = _res.stdout.strip()
+                            source   = "xfyun"
+                            done     = True
+                            print(f"  [transcribe] xfyun OK {len(text_out)} chars", flush=True)
+                        else:
+                            print(f"  [transcribe] xfyun FAILED({_res.returncode}): {_res.stderr[:100]}", flush=True)
+                except Exception as _e:
+                    print(f"  [transcribe] xfyun exception: {_e}", flush=True)
+            else:
+                print(f"  [transcribe] xfyun script not found: {_xfyun_script}", flush=True)
+
+        # -- Ultimate fallback: mlx ----------------------------
+        if not done:
+            res = transcribe_local_async(wav_path, model_name="base", language="zh")
+            if res.get("status") in ("SUCCEEDED", "done") and res.get("text"):
+                text_out = res["text"]
+                source   = "mlx:base"
+                done     = True
+                print(f"  [transcribe] mlx fallback OK {len(text_out)} chars", flush=True)
+            elif res.get("text"):
+                text_out = res["text"]
+                source   = "mlx:base"
+                done     = True
+                print(f"  [transcribe] mlx degraded OK {len(text_out)} chars", flush=True)
+            else:
+                print(f"  [transcribe] ALL ASR FAILED for {os.path.basename(md_path)}", flush=True)
+
+        if done and text_out:
+            apply_transcript(md_path, text_out, source=source)
+            print(f"  [transcribe] {os.path.basename(md_path)} done ({source}, {len(text_out)} chars)", flush=True)
+        else:
+            print(f"  [transcribe] {os.path.basename(md_path)} empty, still enqueue SUMMARIZE", flush=True)
+
+    finally:
+        if wav_path and os.path.exists(wav_path):
+            try: os.unlink(wav_path)
+            except Exception: pass
+
+    if queue_engine is not None:
+        queue_engine.enqueue(md_path, "SUMMARIZE")
+def runner_summarize(job_row: sqlite3.Row, *, queue_engine: QueueEngine | None = None):
+    """stage 3 runner: \u8bfb md \u7684\u6b63\u6587 \u2192 summarize_text \u2192 inject_summary_to_md."""
+    from common.summarize import summarize_text, has_summary_section, inject_summary_to_md
+
+    md_path = job_row["md_path"]
+    p = Path(md_path)
+    if not p.exists():
+        raise FileNotFoundError(md_path)
+
+    if has_summary_section(md_path):
+        print(f"  [summarize] {p.name} \u5df2\u6709 ## \u603b\u7ed3 \u6bb5, \u8df3\u8fc7", flush=True)
+        return
+
+    text = p.read_text(encoding="utf-8")
+    # \u5265 frontmatter + ## \u4e4b\u540e\u7684\u6b63\u6587 (\u542b ## \u8f6c\u5f55 \u6bb5\u5982\u679c\u6709)
+    import re
+    body = re.sub(r"^---\n.*?\n---\n", "", text, count=1, flags=re.S).strip()
+    # \u53bb\u6389 abstract \u533a\u57df (\u7b2c\u4e00\u4e2a ## \u4e4b\u524d), \u4f46\u4fdd\u7559 ## \u8f6c\u5f55 \u5982\u679c\u6709
+    m = re.search(r"^##\s", body, re.M)
+    if m:
+        body = body[m.start():]
+
+    if len(body) < 100:
+        print(f"  [summarize] {p.name} \u6b63\u6587\u592a\u77ed ({len(body)} chars), \u8df3\u8fc7", flush=True)
+        return
+
+    obj = summarize_text(body, engine="auto", min_chars=100)
+    inject_summary_to_md(md_path, obj)
+    print(f"  [summarize] {p.name} \u603b\u7ed3\u5b8c\u6210 ({len(obj.get('summary', ''))} chars summary, engine={obj.get('engine')})", flush=True)
+
+
+# \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+# CLI
+# \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+
+
+def _make_runner(stage: str, engine: QueueEngine):
+    """\u7ed9 start_pool \u7528\u7684 runner factory (\u7ed1\u5b9a queue_engine \u4f9b\u4e0b\u4e00\u9636\u6bb5 enqueue)."""
+    if stage == "TRANSCRIBE":
+        def r(row):
+            return runner_transcribe(row, queue_engine=engine)
+        return r
+    if stage == "SUMMARIZE":
+        def r(row):
+            return runner_summarize(row, queue_engine=engine)
+        return r
+    raise ValueError(f"unknown stage: {stage}")
+
+
+def _cli():
+    p = argparse.ArgumentParser(description="ominicrawl job queue (阶段 C)")
+    sub = p.add_subparsers(dest="cmd", required=True)
+
+    sub.add_parser("status", help="\u67e5\u770b\u961f\u5217\u72b6\u6001")
+
+    sp_recover = sub.add_parser("recover", help="\u91cd\u7f6e\u8d85\u65f6 RUNNING \u4e3a PENDING")
+    sp_recover.add_argument("--older-than-sec", type=int, default=300)
+
+    sp_enq = sub.add_parser("enqueue", help="\u63a8\u5165\u4e00\u4e2a job")
+    sp_enq.add_argument("md_path")
+    sp_enq.add_argument("stage", choices=_STAGES)
+
+    sp_run = sub.add_parser("run-pool", help="\u8d77 worker pool \u9635\u9635\u8dd1\u5f53\u524d\u961f\u5217 (\u9636\u6bb5 E \u9a8c\u8bc1\u7528)")
+    sp_run.add_argument("stage", choices=_STAGES)
+    sp_run.add_argument("--size", type=int, default=3)
+    sp_run.add_argument("--idle-sleep", type=float, default=2.0)
+
+    args = p.parse_args()
+    engine = QueueEngine()
+
+    if args.cmd == "status":
+        import json
+        print(json.dumps(engine.status(), ensure_ascii=False, indent=2))
+    elif args.cmd == "recover":
+        n = engine.recover_orphans(args.older_than_sec)
+        print(f"\u91cd\u7f6e {n} \u4e2a RUNNING \u8d85\u65f6 job \u4e3a PENDING")
+    elif args.cmd == "enqueue":
+        jid = engine.enqueue(args.md_path, args.stage)
+        print(f"\u63a8\u5165 job #{jid}: {args.stage} {args.md_path}")
+    elif args.cmd == "run-pool":
+        runner = _make_runner(args.stage, engine)
+        threads = start_pool(engine, args.stage, runner, size=args.size)
+        print(f"\u5df2\u8d77 {len(threads)} \u4e2a worker, \u6309 Ctrl+C \u9000\u51fa")
+        try:
+            while True:
+                time.sleep(60)
+                s = engine.status()
+                print(f"  [\u961f\u5217] {s}", flush=True)
+        except KeyboardInterrupt:
+            print("\u6536\u5230\u4e2d\u65ad, \u9000\u51fa")
+            return
+
+
+if __name__ == "__main__":
+    _cli()

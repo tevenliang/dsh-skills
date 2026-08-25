@@ -1,0 +1,13 @@
+{"ts": "2026-08-08T19:42:46+08:00", "event": "run_started", "date": "20260808"}
+{"ts": "2026-08-08T19:42:57+08:00", "event": "phase_started", "phase": "watchlist"}
+{"ts": "2026-08-08T19:42:57+08:00", "event": "sub_process_spawning", "cmd": ["/Users/tianwenliang/.agents/skills/crawl/../../.venv/bin/python3", "/Users/tianwenliang/.agents/skills/crawl/common-flow/crawl.py", "watchlist", "--date", "20260808"]}
+{"ts": "2026-08-08T19:42:57+08:00", "event": "sub_process_started", "pid": 96394, "cmd": ["/Users/tianwenliang/.agents/skills/crawl/../../.venv/bin/python3", "/Users/tianwenliang/.agents/skills/crawl/common-flow/crawl.py", "watchlist", "--date", "20260808"]}
+{"ts": "2026-08-08T20:00:58+08:00", "event": "sub_process_killed", "reason": "active item unchanged for 600s", "active_signature": "('B站', '林亦LYi', '0/5 (0%)')"}
+{"ts": "2026-08-08T20:01:04+08:00", "event": "sub_process_exited", "phase": "watchlist", "exit_code": 143, "total_elapsed_sec": 1087.0}
+{"ts": "2026-08-08T20:01:04+08:00", "event": "phase_finished", "phase": "watchlist", "exit_code": 143, "duration_sec": 1087.0}
+{"ts": "2026-08-08T20:01:04+08:00", "event": "phase_started", "phase": "clip"}
+{"ts": "2026-08-08T20:01:04+08:00", "event": "sub_process_spawning", "cmd": ["/Users/tianwenliang/.agents/skills/crawl/../../.venv/bin/python3", "/Users/tianwenliang/.agents/skills/crawl/common-flow/crawl.py", "clip"]}
+{"ts": "2026-08-08T20:01:04+08:00", "event": "sub_process_started", "pid": 96855, "cmd": ["/Users/tianwenliang/.agents/skills/crawl/../../.venv/bin/python3", "/Users/tianwenliang/.agents/skills/crawl/common-flow/crawl.py", "clip"]}
+{"ts": "2026-08-08T20:01:10+08:00", "event": "sub_process_exited", "phase": "clip", "exit_code": 0, "total_elapsed_sec": 5.2}
+{"ts": "2026-08-08T20:01:10+08:00", "event": "phase_finished", "phase": "clip", "exit_code": 0, "duration_sec": 5.2}
+{"ts": "2026-08-08T20:01:10+08:00", "event": "run_finished", "exit_code": 1}
