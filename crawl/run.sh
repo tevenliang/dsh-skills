@@ -49,25 +49,6 @@ if ! _python_ok "$PY"; then
     exit 2
 fi
 
-# ── 凭证注入（从 credential 文件读取，不再硬编码）─────────────
-_XFYUN_CREDS="$HOME/.agents/credentials/ominicrawl/xfyun.json"
-if [[ -f "$_XFYUN_CREDS" ]]; then
-    # 读取 JSON 凭证（需 Python 解析）
-    _xf_appid=$($PY -c "import json; print(json.load(open('$_XFYUN_CREDS'))['appid'])" 2>/dev/null)
-    _xf_apikey=$($PY -c "import json; print(json.load(open('$_XFYUN_CREDS'))['apikey'])" 2>/dev/null)
-    _xf_apisecret=$($PY -c "import json; print(json.load(open('$_XFYUN_CREDS'))['apisecret'])" 2>/dev/null)
-    if [[ -n "$_xf_appid" ]]; then
-        export XFYUN_APPID="$_xf_appid"
-        export XFYUN_APIKEY="$_xf_apikey"
-        export XFYUN_APISECRET="$_xf_apisecret"
-        echo "[run.sh] XFYUN 凭证已从 $_XFYUN_CREDS 加载"
-    else
-        echo "[run.sh] ⚠️ XFYUN 凭证文件格式错误，XFYUN 相关功能可能不可用" >&2
-    fi
-else
-    echo "[run.sh] ⚠️ XFYUN 凭证文件不存在: $_XFYUN_CREDS，XFYUN 相关功能可能不可用" >&2
-fi
-
 # ── 参数解析 ──────────────────────────────────────────────
 DATE=$(date +%Y%m%d)
 CMD=${1:-all}
