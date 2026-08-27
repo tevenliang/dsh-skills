@@ -1,0 +1,43 @@
+# crawl-vm 配置文件
+# 完全运行在 VM 上，不依赖 Mac
+
+vault: /home/ubuntu/webdav/steven_vault
+
+# 关键路径
+skills_path: /home/ubuntu/.agents/skills/crawl
+
+# 平台配置
+platforms:
+  douyin:
+    enabled: true
+    cookie_file: /home/ubuntu/.agents/credentials/ominicrawl/douyin.txt
+    # Cookie 从 config.yaml 的 TokenManager 段读取
+    cookie_config: /home/ubuntu/.agents/skills/crawl/ingest-douyin/douyin_api/crawlers/douyin/web/config.yaml
+  bilibili:
+    enabled: true
+    cookie_file: /home/ubuntu/.agents/credentials/ominicrawl/bilibili.txt
+
+# 转录配置 (Groq Whisper)
+transcription:
+  model: whisper-large-v3
+  proxy: http://127.0.0.1:7890  # VPN 代理
+
+# 总结配置 (Groq LLM)
+summarization:
+  model: qwen/qwen3.8-27b
+  max_tokens: 1024
+  temperature: 0.3
+  min_chars: 300
+
+# 代理配置
+vm:
+  proxy: http://127.0.0.1:7890
+
+# 爬虫配置
+crawler:
+  # 同一 IP 请求间隔（秒），防止被风控
+  request_delay: 2
+  # 最大重试次数
+  max_retries: 3
+  # 单次最多处理视频数（0 = 不限制）
+  max_videos_per_author: 0

@@ -288,7 +288,7 @@ def _build_download_headers(platform: str, audio_url: str) -> dict:
 # --- ASR provider round-robin helpers (job-level) ---
 import threading as _thr, json as _json
 
-_TRANSCRIBE_PROVIDERS = ["bailian", "groq", "xfyun", "mlx"]  # job-id mod 4, 讯飞仅 <60s
+_TRANSCRIBE_PROVIDERS = ["bailian", "groq", "mlx"]  # job-id mod 3
 _GROQ_KEY = None
 
 def _groq_key():
@@ -305,45 +305,12 @@ def _groq_key():
                 pass
     return _GROQ_KEY or ""
 
-_XFYUN_CREDS = None
-
-def _xfyun_creds():
-    """加载讯飞凭证，优先从环境变量读，兜底从 credential 文件读。"""
-    global _XFYUN_CREDS
-    if _XFYUN_CREDS is not None:
-        return _XFYUN_CREDS
-    # 先查环境变量
-    appid = os.environ.get("XFYUN_APPID", "")
-    apikey = os.environ.get("XFYUN_APIKEY", "")
-    apisecret = os.environ.get("XFYUN_APISECRET", "")
-    if appid and apikey and apisecret:
-        _XFYUN_CREDS = {"appid": appid, "apikey": apikey, "apisecret": apisecret}
-        return _XFYUN_CREDS
-    # 兜底 credential 文件
-    for p in [SKILL_DIR.parent.parent / "credentials/ominicrawl/xfyun.json",
-              Path.home() / ".agents/credentials/ominicrawl/xfyun.json"]:
-        if p.exists():
-            try:
-                data = _json.loads(p.read_text())
-                _XFYUN_CREDS = {
-                    "appid": data.get("appid", ""),
-                    "apikey": data.get("apikey", ""),
-                    "apisecret": data.get("apisecret", ""),
-                }
-                if _XFYUN_CREDS["appid"]:
-                    return _XFYUN_CREDS
-            except Exception:
-                pass
-    return {"appid": "", "apikey": "", "apisecret": ""}
-
 def _next_provider(job_id, dur_s):
     """按 job_id mod N 选 provider, groq 仅用于 <60s 音频."""
     idx = int(job_id or 0) % len(_TRANSCRIBE_PROVIDERS)
     p = _TRANSCRIBE_PROVIDERS[idx]
     if p == "groq" and dur_s >= 60:
         p = "bailian"
-    if p == "xfyun" and dur_s >= 60:
-        p = "bailian"   # xfyun 单段上限 60s
     return p
 
 
@@ -358,8 +325,6 @@ def runner_transcribe(job_row, *, queue_engine=None):
         transcribe_local_async,
         apply_transcript,
     )
-    # 讯飞脚本
-    _xfyun_script = SKILL_DIR.parent / "xfyun-iat" / "scripts" / "xfyun_iat.py"
 
     md_path   = job_row["md_path"]
     fm        = _read_md_frontmatter(md_path)
@@ -417,38 +382,6 @@ def runner_transcribe(job_row, *, queue_engine=None):
                 print(f"  [transcribe] groq OK {len(text_out)} chars", flush=True)
             else:
                 print(f"  [transcribe] groq FAILED", flush=True)
-
-        if not done and provider == "xfyun":
-            import sys as _sys
-            if _xfyun_script.exists():
-                _sys.path.insert(0, str(_xfyun_script.parent))
-                try:
-                    _xf = _xfyun_creds()
-                    if not _xf.get("appid"):
-                        print(f"  [transcribe] xfyun 凭证未配置 (appid 为空)，跳过", flush=True)
-                    else:
-                        _xf_env = {
-                            "XFYUN_APPID":    _xf["appid"],
-                            "XFYUN_APIKEY":   _xf["apikey"],
-                            "XFYUN_APISECRET": _xf["apisecret"],
-                        }
-                        import subprocess as _sub
-                        _env = dict(os.environ); _env.update(_xf_env)
-                        _res = _sub.run(
-                            [_sys.executable, str(_xfyun_script), wav_path, "--auto-resample", "--chunk-seconds", "50"],
-                            capture_output=True, text=True, timeout=120, env=_env
-                        )
-                        if _res.returncode == 0 and _res.stdout.strip():
-                            text_out = _res.stdout.strip()
-                            source   = "xfyun"
-                            done     = True
-                            print(f"  [transcribe] xfyun OK {len(text_out)} chars", flush=True)
-                        else:
-                            print(f"  [transcribe] xfyun FAILED({_res.returncode}): {_res.stderr[:100]}", flush=True)
-                except Exception as _e:
-                    print(f"  [transcribe] xfyun exception: {_e}", flush=True)
-            else:
-                print(f"  [transcribe] xfyun script not found: {_xfyun_script}", flush=True)
 
         # -- Ultimate fallback: mlx ----------------------------
         if not done:
