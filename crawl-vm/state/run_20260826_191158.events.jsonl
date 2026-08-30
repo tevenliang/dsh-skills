@@ -1,0 +1,4 @@
+{"ts": "2026-08-26T19:11:58.961948", "event": "start", "tag": "20260826_191158", "platforms": "douyin"}
+{"ts": "2026-08-26T19:11:58.970532", "event": "start", "tag": "20260826_191158", "platform": "douyin", "video_id": "7673836885130661158"}
+{"ts": "2026-08-26T19:11:59.562087", "event": "skipped", "tag": "20260826_191158", "platform": "douyin", "video_id": "7673836885130661158", "reason": "already_processed"}
+{"ts": "2026-08-26T19:11:59.562423", "event": "complete", "tag": "20260826_191158"}

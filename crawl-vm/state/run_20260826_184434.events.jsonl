@@ -1,0 +1,4 @@
+{"ts": "2026-08-26T18:44:34.505760", "event": "start", "tag": "20260826_184434", "platforms": "bilibili"}
+{"ts": "2026-08-26T18:44:34.506527", "event": "start", "tag": "20260826_184434", "platform": "bilibili", "video_id": "BV1xx411c7mu"}
+{"ts": "2026-08-26T18:44:34.506832", "event": "failed", "tag": "20260826_184434", "platform": "bilibili", "video_id": "BV1xx411c7mu", "reason": "wbi mixin_key 尚未初始化, 请先 await fetch_mixin_key()"}
+{"ts": "2026-08-26T18:44:34.507343", "event": "complete", "tag": "20260826_184434"}

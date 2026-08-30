@@ -1,0 +1,45 @@
+{"ts": "2026-08-27T22:13:17.414595", "event": "start", "tag": "20260827_221317", "platforms": "bilibili"}
+{"ts": "2026-08-27T22:13:17.914318", "event": "start", "tag": "20260827_221317", "platform": "bilibili", "video_id": "BV1cm8M6MELW"}
+{"ts": "2026-08-27T22:13:18.053841", "event": "skipped", "tag": "20260827_221317", "platform": "bilibili", "video_id": "BV1cm8M6MELW", "reason": "already_processed"}
+{"ts": "2026-08-27T22:13:20.056193", "event": "start", "tag": "20260827_221317", "platform": "bilibili", "video_id": "BV1SwgL6pErx"}
+{"ts": "2026-08-27T22:13:20.207072", "event": "skipped", "tag": "20260827_221317", "platform": "bilibili", "video_id": "BV1SwgL6pErx", "reason": "already_processed"}
+{"ts": "2026-08-27T22:13:22.209443", "event": "start", "tag": "20260827_221317", "platform": "bilibili", "video_id": "BV143un6fESA"}
+{"ts": "2026-08-27T22:13:22.353454", "event": "skipped", "tag": "20260827_221317", "platform": "bilibili", "video_id": "BV143un6fESA", "reason": "already_processed"}
+{"ts": "2026-08-27T22:13:24.355885", "event": "start", "tag": "20260827_221317", "platform": "bilibili", "video_id": "BV1arNE6REDn"}
+{"ts": "2026-08-27T22:13:25.661151", "event": "skipped", "tag": "20260827_221317", "platform": "bilibili", "video_id": "BV1arNE6REDn", "reason": "already_processed"}
+{"ts": "2026-08-27T22:13:27.661754", "event": "start", "tag": "20260827_221317", "platform": "bilibili", "video_id": "BV1FDTF69E15"}
+{"ts": "2026-08-27T22:13:27.799400", "event": "skipped", "tag": "20260827_221317", "platform": "bilibili", "video_id": "BV1FDTF69E15", "reason": "already_processed"}
+{"ts": "2026-08-27T22:13:29.801763", "event": "start", "tag": "20260827_221317", "platform": "bilibili", "video_id": "BV1Jhjm6LE1b"}
+{"ts": "2026-08-27T22:13:29.953145", "event": "skipped", "tag": "20260827_221317", "platform": "bilibili", "video_id": "BV1Jhjm6LE1b", "reason": "already_processed"}
+{"ts": "2026-08-27T22:13:31.955493", "event": "start", "tag": "20260827_221317", "platform": "bilibili", "video_id": "BV1PWLX6aE6X"}
+{"ts": "2026-08-27T22:13:32.125794", "event": "skipped", "tag": "20260827_221317", "platform": "bilibili", "video_id": "BV1PWLX6aE6X", "reason": "already_processed"}
+{"ts": "2026-08-27T22:13:34.128162", "event": "start", "tag": "20260827_221317", "platform": "bilibili", "video_id": "BV1MXj36sEL5"}
+{"ts": "2026-08-27T22:13:34.278827", "event": "skipped", "tag": "20260827_221317", "platform": "bilibili", "video_id": "BV1MXj36sEL5", "reason": "already_processed"}
+{"ts": "2026-08-27T22:13:36.280780", "event": "start", "tag": "20260827_221317", "platform": "bilibili", "video_id": "BV1CT7C6uEZ1"}
+{"ts": "2026-08-27T22:13:36.426038", "event": "skipped", "tag": "20260827_221317", "platform": "bilibili", "video_id": "BV1CT7C6uEZ1", "reason": "already_processed"}
+{"ts": "2026-08-27T22:13:38.428391", "event": "start", "tag": "20260827_221317", "platform": "bilibili", "video_id": "BV1ZhEc61EF8"}
+{"ts": "2026-08-27T22:13:38.842377", "event": "skipped", "tag": "20260827_221317", "platform": "bilibili", "video_id": "BV1ZhEc61EF8", "reason": "already_processed"}
+{"ts": "2026-08-27T22:13:40.844776", "event": "start", "tag": "20260827_221317", "platform": "bilibili", "video_id": "BV1EPVY6dEMq"}
+{"ts": "2026-08-27T22:13:40.984489", "event": "skipped", "tag": "20260827_221317", "platform": "bilibili", "video_id": "BV1EPVY6dEMq", "reason": "already_processed"}
+{"ts": "2026-08-27T22:13:42.986970", "event": "start", "tag": "20260827_221317", "platform": "bilibili", "video_id": "BV1rTG96nEvb"}
+{"ts": "2026-08-27T22:13:43.124066", "event": "skipped", "tag": "20260827_221317", "platform": "bilibili", "video_id": "BV1rTG96nEvb", "reason": "already_processed"}
+{"ts": "2026-08-27T22:13:45.126431", "event": "start", "tag": "20260827_221317", "platform": "bilibili", "video_id": "BV14YVA6sEfZ"}
+{"ts": "2026-08-27T22:13:45.386431", "event": "skipped", "tag": "20260827_221317", "platform": "bilibili", "video_id": "BV14YVA6sEfZ", "reason": "already_processed"}
+{"ts": "2026-08-27T22:13:47.388800", "event": "start", "tag": "20260827_221317", "platform": "bilibili", "video_id": "BV1jfG961E7s"}
+{"ts": "2026-08-27T22:13:47.554392", "event": "skipped", "tag": "20260827_221317", "platform": "bilibili", "video_id": "BV1jfG961E7s", "reason": "already_processed"}
+{"ts": "2026-08-27T22:13:49.556761", "event": "start", "tag": "20260827_221317", "platform": "bilibili", "video_id": "BV1MxG46WEp7"}
+{"ts": "2026-08-27T22:13:49.709264", "event": "skipped", "tag": "20260827_221317", "platform": "bilibili", "video_id": "BV1MxG46WEp7", "reason": "already_processed"}
+{"ts": "2026-08-27T22:13:51.711646", "event": "start", "tag": "20260827_221317", "platform": "bilibili", "video_id": "BV1LXLi6qEkn"}
+{"ts": "2026-08-27T22:13:51.895430", "event": "skipped", "tag": "20260827_221317", "platform": "bilibili", "video_id": "BV1LXLi6qEkn", "reason": "already_processed"}
+{"ts": "2026-08-27T22:13:53.897789", "event": "start", "tag": "20260827_221317", "platform": "bilibili", "video_id": "BV1XkLq6AEW2"}
+{"ts": "2026-08-27T22:13:54.044547", "event": "skipped", "tag": "20260827_221317", "platform": "bilibili", "video_id": "BV1XkLq6AEW2", "reason": "already_processed"}
+{"ts": "2026-08-27T22:13:56.046925", "event": "start", "tag": "20260827_221317", "platform": "bilibili", "video_id": "BV1J8596pEgM"}
+{"ts": "2026-08-27T22:13:56.199644", "event": "skipped", "tag": "20260827_221317", "platform": "bilibili", "video_id": "BV1J8596pEgM", "reason": "already_processed"}
+{"ts": "2026-08-27T22:13:58.202027", "event": "start", "tag": "20260827_221317", "platform": "bilibili", "video_id": "BV1Mt5T6uE6x"}
+{"ts": "2026-08-27T22:13:58.359340", "event": "skipped", "tag": "20260827_221317", "platform": "bilibili", "video_id": "BV1Mt5T6uE6x", "reason": "already_processed"}
+{"ts": "2026-08-27T22:14:00.361750", "event": "start", "tag": "20260827_221317", "platform": "bilibili", "video_id": "BV1x85t64E3L"}
+{"ts": "2026-08-27T22:14:00.508018", "event": "skipped", "tag": "20260827_221317", "platform": "bilibili", "video_id": "BV1x85t64E3L", "reason": "already_processed"}
+{"ts": "2026-08-27T22:14:02.510394", "event": "start", "tag": "20260827_221317", "platform": "bilibili", "video_id": "BV1wRdwBSEBf"}
+{"ts": "2026-08-27T22:14:02.657218", "event": "skipped", "tag": "20260827_221317", "platform": "bilibili", "video_id": "BV1wRdwBSEBf", "reason": "already_processed"}
+{"ts": "2026-08-27T22:14:04.659577", "event": "start", "tag": "20260827_221317", "platform": "bilibili", "video_id": "BV1LmorBDE6H"}
+{"ts": "2026-08-27T22:14:53.986538", "event": "success", "tag": "20260827_221317", "platform": "bilibili", "video_id": "BV1LmorBDE6H", "title": "【能源基金】市场的一条暗线！"}

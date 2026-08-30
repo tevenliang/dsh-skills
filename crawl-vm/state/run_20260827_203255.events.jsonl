@@ -1,0 +1,231 @@
+{"ts": "2026-08-27T20:32:55.014257", "event": "start", "tag": "20260827_203255", "platforms": "all"}
+{"ts": "2026-08-27T20:32:56.441239", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7054855328130747662"}
+{"ts": "2026-08-27T20:32:57.100933", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7054855328130747662", "reason": "already_processed"}
+{"ts": "2026-08-27T20:32:59.103458", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7061910077552233765"}
+{"ts": "2026-08-27T20:32:59.560172", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7061910077552233765", "reason": "already_processed"}
+{"ts": "2026-08-27T20:33:01.562590", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7675298378776335818"}
+{"ts": "2026-08-27T20:33:02.629812", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7675298378776335818", "reason": "already_processed"}
+{"ts": "2026-08-27T20:33:04.632236", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7674123386315199483"}
+{"ts": "2026-08-27T20:33:05.447888", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7674123386315199483", "reason": "already_processed"}
+{"ts": "2026-08-27T20:33:07.449809", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7674121881427908849"}
+{"ts": "2026-08-27T20:33:08.208353", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7674121881427908849", "reason": "already_processed"}
+{"ts": "2026-08-27T20:33:10.210857", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7672600204130036467"}
+{"ts": "2026-08-27T20:33:10.846254", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7672600204130036467", "reason": "already_processed"}
+{"ts": "2026-08-27T20:33:13.942435", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7448539659656793407"}
+{"ts": "2026-08-27T20:33:14.448532", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7448539659656793407", "reason": "already_processed"}
+{"ts": "2026-08-27T20:33:16.450948", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7435546933608975653"}
+{"ts": "2026-08-27T20:33:17.158932", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7435546933608975653", "reason": "already_processed"}
+{"ts": "2026-08-27T20:33:19.161365", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7415939977848180005"}
+{"ts": "2026-08-27T20:33:19.700317", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7415939977848180005", "reason": "already_processed"}
+{"ts": "2026-08-27T20:33:21.702805", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7678558764883162011"}
+{"ts": "2026-08-27T20:33:39.947454", "event": "success", "tag": "20260827_203255", "platform": "douyin", "video_id": "7678558764883162011", "title": "又是科技硬件和个股手拉手的一天，下午看能否站上并站稳3939，需要其他科技板块助把力#老徐吐槽"}
+{"ts": "2026-08-27T20:33:41.948723", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7678186182383539366"}
+{"ts": "2026-08-27T20:33:42.736300", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7678186182383539366", "reason": "already_processed"}
+{"ts": "2026-08-27T20:33:44.738768", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7677880300851959918"}
+{"ts": "2026-08-27T20:33:45.211835", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7677880300851959918", "reason": "already_processed"}
+{"ts": "2026-08-27T20:33:47.214336", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7677816329160700786"}
+{"ts": "2026-08-27T20:33:47.698859", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7677816329160700786", "reason": "already_processed"}
+{"ts": "2026-08-27T20:33:49.701281", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7677525532922636762"}
+{"ts": "2026-08-27T20:33:50.163877", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7677525532922636762", "reason": "already_processed"}
+{"ts": "2026-08-27T20:33:52.166306", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7677442409256633190"}
+{"ts": "2026-08-27T20:33:52.665898", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7677442409256633190", "reason": "already_processed"}
+{"ts": "2026-08-27T20:33:54.668328", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7676826178976494702"}
+{"ts": "2026-08-27T20:33:55.150255", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7676826178976494702", "reason": "already_processed"}
+{"ts": "2026-08-27T20:33:57.152454", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7676472737535367854"}
+{"ts": "2026-08-27T20:33:57.665701", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7676472737535367854", "reason": "already_processed"}
+{"ts": "2026-08-27T20:33:59.668131", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7676401252770714762"}
+{"ts": "2026-08-27T20:34:00.180878", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7676401252770714762", "reason": "already_processed"}
+{"ts": "2026-08-27T20:34:02.183342", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7676329023824263090"}
+{"ts": "2026-08-27T20:34:03.244960", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7676329023824263090", "reason": "already_processed"}
+{"ts": "2026-08-27T20:34:06.231313", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7667593057520323866"}
+{"ts": "2026-08-27T20:34:07.309837", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7667593057520323866", "reason": "already_processed"}
+{"ts": "2026-08-27T20:34:09.312258", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7666104941995478281"}
+{"ts": "2026-08-27T20:34:09.987822", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7666104941995478281", "reason": "already_processed"}
+{"ts": "2026-08-27T20:34:11.990276", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7664981449489026323"}
+{"ts": "2026-08-27T20:34:12.455765", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7664981449489026323", "reason": "already_processed"}
+{"ts": "2026-08-27T20:34:14.458170", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7664544990672014642"}
+{"ts": "2026-08-27T20:34:15.663172", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7664544990672014642", "reason": "already_processed"}
+{"ts": "2026-08-27T20:34:18.779563", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7654156725108411688"}
+{"ts": "2026-08-27T20:34:19.221953", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7654156725108411688", "reason": "already_processed"}
+{"ts": "2026-08-27T20:34:21.224448", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7592949839080541446"}
+{"ts": "2026-08-27T20:34:21.674083", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7592949839080541446", "reason": "already_processed"}
+{"ts": "2026-08-27T20:34:23.674955", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7581406927222000932"}
+{"ts": "2026-08-27T20:34:24.128240", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7581406927222000932", "reason": "already_processed"}
+{"ts": "2026-08-27T20:34:26.129789", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7678673769975614763"}
+{"ts": "2026-08-27T20:35:13.516574", "event": "success", "tag": "20260827_203255", "platform": "douyin", "video_id": "7678673769975614763", "title": "调整结束了吗？ 要不要回补仓位？ #燃起来了大国重器 #零距离看懂财经 #股票 #财经 #A股"}
+{"ts": "2026-08-27T20:35:15.518206", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7678299356444806440"}
+{"ts": "2026-08-27T20:35:16.567990", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7678299356444806440", "reason": "already_processed"}
+{"ts": "2026-08-27T20:35:18.570518", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7677919976136690995"}
+{"ts": "2026-08-27T20:35:19.350636", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7677919976136690995", "reason": "already_processed"}
+{"ts": "2026-08-27T20:35:21.353091", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7677554715604929833"}
+{"ts": "2026-08-27T20:35:21.787013", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7677554715604929833", "reason": "already_processed"}
+{"ts": "2026-08-27T20:35:23.789503", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7676434426372328719"}
+{"ts": "2026-08-27T20:35:24.354782", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7676434426372328719", "reason": "already_processed"}
+{"ts": "2026-08-27T20:35:26.357295", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7676086787600682246"}
+{"ts": "2026-08-27T20:35:26.938149", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7676086787600682246", "reason": "already_processed"}
+{"ts": "2026-08-27T20:35:28.939805", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7675704977175743770"}
+{"ts": "2026-08-27T20:35:29.418149", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7675704977175743770", "reason": "already_processed"}
+{"ts": "2026-08-27T20:35:31.420622", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7675336135010225443"}
+{"ts": "2026-08-27T20:35:32.126224", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7675336135010225443", "reason": "already_processed"}
+{"ts": "2026-08-27T20:35:34.128765", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7674954355144969499"}
+{"ts": "2026-08-27T20:35:34.555997", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7674954355144969499", "reason": "already_processed"}
+{"ts": "2026-08-27T20:35:36.558483", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7673839385648958762"}
+{"ts": "2026-08-27T20:35:37.895443", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7673839385648958762", "reason": "already_processed"}
+{"ts": "2026-08-27T20:35:42.552061", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7653702744843761128"}
+{"ts": "2026-08-27T20:35:43.036373", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7653702744843761128", "reason": "already_processed"}
+{"ts": "2026-08-27T20:35:45.039034", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7678228812781889999"}
+{"ts": "2026-08-27T20:35:45.745753", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7678228812781889999", "reason": "already_processed"}
+{"ts": "2026-08-27T20:35:47.748204", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7677752217869705826"}
+{"ts": "2026-08-27T20:36:27.094900", "event": "success", "tag": "20260827_203255", "platform": "douyin", "video_id": "7677752217869705826", "title": "分享。#黄金#白银 #铂金#经验分享"}
+{"ts": "2026-08-27T20:36:29.097642", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7676676174420737896"}
+{"ts": "2026-08-27T20:37:00.187363", "event": "success", "tag": "20260827_203255", "platform": "douyin", "video_id": "7676676174420737896", "title": "分享闲聊 #黄金#白银#铂金#经验分享"}
+{"ts": "2026-08-27T20:37:02.189964", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7675984085080973282"}
+{"ts": "2026-08-27T20:37:59.757473", "event": "success", "tag": "20260827_203255", "platform": "douyin", "video_id": "7675984085080973282", "title": "分享 #黄金#白银#铂金#经验分享"}
+{"ts": "2026-08-27T20:38:01.760121", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7675718666479340259"}
+{"ts": "2026-08-27T20:38:27.459765", "event": "success", "tag": "20260827_203255", "platform": "douyin", "video_id": "7675718666479340259", "title": "分享闲聊 #黄金#白银#铂金#经验分享"}
+{"ts": "2026-08-27T20:38:29.462343", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7675183419056610152"}
+{"ts": "2026-08-27T20:38:54.472443", "event": "success", "tag": "20260827_203255", "platform": "douyin", "video_id": "7675183419056610152", "title": "分享 #黄金#白银#铂金#经验分享"}
+{"ts": "2026-08-27T20:38:56.475104", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7674868361679423360"}
+{"ts": "2026-08-27T20:39:23.571916", "event": "success", "tag": "20260827_203255", "platform": "douyin", "video_id": "7674868361679423360", "title": "分享 #黄金#白银#铂金#经验分享"}
+{"ts": "2026-08-27T20:39:25.574661", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7674077104946039656"}
+{"ts": "2026-08-27T20:39:26.128948", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7674077104946039656", "reason": "already_processed"}
+{"ts": "2026-08-27T20:39:28.131416", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7673683688302960227"}
+{"ts": "2026-08-27T20:39:28.635434", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7673683688302960227", "reason": "already_processed"}
+{"ts": "2026-08-27T20:39:30.637724", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7673347502318334287"}
+{"ts": "2026-08-27T20:40:13.236383", "event": "success", "tag": "20260827_203255", "platform": "douyin", "video_id": "7673347502318334287", "title": "分享 #黄金#白银#铂金#经验分享"}
+{"ts": "2026-08-27T20:40:16.127612", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7661967333758782692"}
+{"ts": "2026-08-27T20:40:16.617098", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7661967333758782692", "reason": "already_processed"}
+{"ts": "2026-08-27T20:40:18.619593", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7556492576381160740"}
+{"ts": "2026-08-27T20:40:19.157319", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7556492576381160740", "reason": "already_processed"}
+{"ts": "2026-08-27T20:40:21.159804", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7555076876285709604"}
+{"ts": "2026-08-27T20:40:21.593925", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7555076876285709604", "reason": "already_processed"}
+{"ts": "2026-08-27T20:40:23.596412", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7678640204631344198"}
+{"ts": "2026-08-27T20:40:36.080821", "event": "success", "tag": "20260827_203255", "platform": "douyin", "video_id": "7678640204631344198", "title": "nand行业的 老四老五 联合起来了…"}
+{"ts": "2026-08-27T20:40:38.083395", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7678633429236427172"}
+{"ts": "2026-08-27T20:40:46.655147", "event": "success", "tag": "20260827_203255", "platform": "douyin", "video_id": "7678633429236427172", "title": "布瑞 call达子了"}
+{"ts": "2026-08-27T20:40:48.657749", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7678597402664254123"}
+{"ts": "2026-08-27T20:41:00.438766", "event": "success", "tag": "20260827_203255", "platform": "douyin", "video_id": "7678597402664254123", "title": "液cold！"}
+{"ts": "2026-08-27T20:41:02.441322", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7678592478261709302"}
+{"ts": "2026-08-27T20:41:15.681363", "event": "success", "tag": "20260827_203255", "platform": "douyin", "video_id": "7678592478261709302", "title": "无标题"}
+{"ts": "2026-08-27T20:41:17.683977", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7678590708634302454"}
+{"ts": "2026-08-27T20:41:29.947706", "event": "success", "tag": "20260827_203255", "platform": "douyin", "video_id": "7678590708634302454", "title": "无标题"}
+{"ts": "2026-08-27T20:41:31.950294", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7678581532465906054"}
+{"ts": "2026-08-27T20:41:49.075014", "event": "success", "tag": "20260827_203255", "platform": "douyin", "video_id": "7678581532465906054", "title": "达子allgood"}
+{"ts": "2026-08-27T20:41:51.076877", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7678326913576848868"}
+{"ts": "2026-08-27T20:41:51.476406", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7678326913576848868", "reason": "already_processed"}
+{"ts": "2026-08-27T20:41:53.478913", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7678319402316831209"}
+{"ts": "2026-08-27T20:42:04.914355", "event": "success", "tag": "20260827_203255", "platform": "douyin", "video_id": "7678319402316831209", "title": "无标题"}
+{"ts": "2026-08-27T20:42:06.917000", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7678314295268358826"}
+{"ts": "2026-08-27T20:42:19.161913", "event": "success", "tag": "20260827_203255", "platform": "douyin", "video_id": "7678314295268358826", "title": "无标题"}
+{"ts": "2026-08-27T20:42:21.936961", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "6998491709780905253"}
+{"ts": "2026-08-27T20:42:22.335950", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "6998491709780905253", "reason": "already_processed"}
+{"ts": "2026-08-27T20:42:24.338445", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "6873477974205730052"}
+{"ts": "2026-08-27T20:42:24.772537", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "6873477974205730052", "reason": "already_processed"}
+{"ts": "2026-08-27T20:42:26.775045", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7676807023997105642"}
+{"ts": "2026-08-27T20:42:27.557551", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7676807023997105642", "reason": "already_processed"}
+{"ts": "2026-08-27T20:42:29.560086", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7676030773283162027"}
+{"ts": "2026-08-27T20:42:30.121034", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7676030773283162027", "reason": "already_processed"}
+{"ts": "2026-08-27T20:42:32.123555", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7672266838633417151"}
+{"ts": "2026-08-27T20:42:32.672013", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7672266838633417151", "reason": "already_processed"}
+{"ts": "2026-08-27T20:42:35.657892", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7624036390934506624"}
+{"ts": "2026-08-27T20:42:36.131090", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7624036390934506624", "reason": "already_processed"}
+{"ts": "2026-08-27T20:42:38.133594", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7616284838891066978"}
+{"ts": "2026-08-27T20:42:38.608547", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7616284838891066978", "reason": "already_processed"}
+{"ts": "2026-08-27T20:42:40.611038", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7602963179330099811"}
+{"ts": "2026-08-27T20:42:41.031437", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7602963179330099811", "reason": "already_processed"}
+{"ts": "2026-08-27T20:42:43.033782", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7678662427629984866"}
+{"ts": "2026-08-27T20:43:05.221821", "event": "success", "tag": "20260827_203255", "platform": "douyin", "video_id": "7678662427629984866", "title": "8.27：有色净流 出 8 亿，轮动加快，有色可以继续看。#有色金属 #工业金属 #贵金属 #黄金  #飞总说市"}
+{"ts": "2026-08-27T20:43:07.224555", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7678487821766021288"}
+{"ts": "2026-08-27T20:43:35.564606", "event": "success", "tag": "20260827_203255", "platform": "douyin", "video_id": "7678487821766021288", "title": "8.26：有色净流入 54 亿，冲高回落，不是它不努力，是金。#有色金属 #工业金属 #贵金属 #黄金 #券商"}
+{"ts": "2026-08-27T20:43:37.567216", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7677912430174124770"}
+{"ts": "2026-08-27T20:43:38.534899", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7677912430174124770", "reason": "already_processed"}
+{"ts": "2026-08-27T20:43:40.537385", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7677594655718528399"}
+{"ts": "2026-08-27T20:43:40.915541", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7677594655718528399", "reason": "already_processed"}
+{"ts": "2026-08-27T20:43:42.918080", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7677135124182461544"}
+{"ts": "2026-08-27T20:43:43.365120", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7677135124182461544", "reason": "already_processed"}
+{"ts": "2026-08-27T20:43:45.367632", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7676443697614169024"}
+{"ts": "2026-08-27T20:43:45.877551", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7676443697614169024", "reason": "already_processed"}
+{"ts": "2026-08-27T20:43:47.880114", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7676082160072497123"}
+{"ts": "2026-08-27T20:43:48.492957", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7676082160072497123", "reason": "already_processed"}
+{"ts": "2026-08-27T20:43:50.495496", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7675695182725370981"}
+{"ts": "2026-08-27T20:43:50.929157", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7675695182725370981", "reason": "already_processed"}
+{"ts": "2026-08-27T20:43:52.931700", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7675356882948862888"}
+{"ts": "2026-08-27T20:43:53.471785", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7675356882948862888", "reason": "already_processed"}
+{"ts": "2026-08-27T20:43:55.473800", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7674947647652146804"}
+{"ts": "2026-08-27T20:43:55.921152", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7674947647652146804", "reason": "already_processed"}
+{"ts": "2026-08-27T20:43:58.468516", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7676445050418613545"}
+{"ts": "2026-08-27T20:43:59.129373", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7676445050418613545", "reason": "already_processed"}
+{"ts": "2026-08-27T20:44:01.130793", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7675312227796225299"}
+{"ts": "2026-08-27T20:44:01.956320", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7675312227796225299", "reason": "already_processed"}
+{"ts": "2026-08-27T20:44:03.959022", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7674161157996940559"}
+{"ts": "2026-08-27T20:44:04.332059", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7674161157996940559", "reason": "already_processed"}
+{"ts": "2026-08-27T20:44:06.334607", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7674208013741346091"}
+{"ts": "2026-08-27T20:44:06.845292", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7674208013741346091", "reason": "already_processed"}
+{"ts": "2026-08-27T20:44:09.730627", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7645275578509332392"}
+{"ts": "2026-08-27T20:44:10.447880", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7645275578509332392", "reason": "already_processed"}
+{"ts": "2026-08-27T20:44:12.450454", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7641939408183164084"}
+{"ts": "2026-08-27T20:44:12.966055", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7641939408183164084", "reason": "already_processed"}
+{"ts": "2026-08-27T20:44:14.968609", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7292442202062605618"}
+{"ts": "2026-08-27T20:44:15.394815", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7292442202062605618", "reason": "already_processed"}
+{"ts": "2026-08-27T20:44:17.396810", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7677949051959358627"}
+{"ts": "2026-08-27T20:44:17.919894", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7677949051959358627", "reason": "already_processed"}
+{"ts": "2026-08-27T20:44:19.922464", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7677612765599871330"}
+{"ts": "2026-08-27T20:44:20.427821", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7677612765599871330", "reason": "already_processed"}
+{"ts": "2026-08-27T20:44:22.430421", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7677139425272542912"}
+{"ts": "2026-08-27T20:44:22.858700", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7677139425272542912", "reason": "already_processed"}
+{"ts": "2026-08-27T20:44:24.861224", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7676779360641098932"}
+{"ts": "2026-08-27T20:44:25.491591", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7676779360641098932", "reason": "already_processed"}
+{"ts": "2026-08-27T20:44:27.492261", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7676426839305654080"}
+{"ts": "2026-08-27T20:44:27.925534", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7676426839305654080", "reason": "already_processed"}
+{"ts": "2026-08-27T20:44:29.928146", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7676085892910594408"}
+{"ts": "2026-08-27T20:44:30.554655", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7676085892910594408", "reason": "already_processed"}
+{"ts": "2026-08-27T20:44:32.557259", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7675737410869164352"}
+{"ts": "2026-08-27T20:44:33.006826", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7675737410869164352", "reason": "already_processed"}
+{"ts": "2026-08-27T20:44:35.008116", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7675347453629692002"}
+{"ts": "2026-08-27T20:44:35.567860", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7675347453629692002", "reason": "already_processed"}
+{"ts": "2026-08-27T20:44:37.570399", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7674921522528898467"}
+{"ts": "2026-08-27T20:44:38.191383", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7674921522528898467", "reason": "already_processed"}
+{"ts": "2026-08-27T20:44:40.193940", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7674235299422350312"}
+{"ts": "2026-08-27T20:44:40.803979", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7674235299422350312", "reason": "already_processed"}
+{"ts": "2026-08-27T20:44:43.613779", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7103469551442038030"}
+{"ts": "2026-08-27T20:44:44.055470", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7103469551442038030", "reason": "already_processed"}
+{"ts": "2026-08-27T20:44:46.058049", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7678280661643414834"}
+{"ts": "2026-08-27T20:44:46.582691", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7678280661643414834", "reason": "already_processed"}
+{"ts": "2026-08-27T20:44:48.585295", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7677546608283700523"}
+{"ts": "2026-08-27T20:44:49.067417", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7677546608283700523", "reason": "already_processed"}
+{"ts": "2026-08-27T20:44:51.070006", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7677545966915915062"}
+{"ts": "2026-08-27T20:44:51.665535", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7677545966915915062", "reason": "already_processed"}
+{"ts": "2026-08-27T20:44:53.668129", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7676300858711198976"}
+{"ts": "2026-08-27T20:44:54.154106", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7676300858711198976", "reason": "already_processed"}
+{"ts": "2026-08-27T20:44:56.156748", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7676386602129558835"}
+{"ts": "2026-08-27T20:44:56.620567", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7676386602129558835", "reason": "already_processed"}
+{"ts": "2026-08-27T20:44:58.623163", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7676057507868986667"}
+{"ts": "2026-08-27T20:44:59.140485", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7676057507868986667", "reason": "already_processed"}
+{"ts": "2026-08-27T20:45:01.143049", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7675684533085146368"}
+{"ts": "2026-08-27T20:45:01.650839", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7675684533085146368", "reason": "already_processed"}
+{"ts": "2026-08-27T20:45:03.653093", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7675315413663665448"}
+{"ts": "2026-08-27T20:45:04.165707", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7675315413663665448", "reason": "already_processed"}
+{"ts": "2026-08-27T20:45:06.168257", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7673838499631615232"}
+{"ts": "2026-08-27T20:45:06.755099", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7673838499631615232", "reason": "already_processed"}
+{"ts": "2026-08-27T20:45:08.758562", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7673837588213402895"}
+{"ts": "2026-08-27T20:45:09.366286", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7673837588213402895", "reason": "already_processed"}
+{"ts": "2026-08-27T20:45:12.332195", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7650791439332429090"}
+{"ts": "2026-08-27T20:45:46.002476", "event": "success", "tag": "20260827_203255", "platform": "douyin", "video_id": "7650791439332429090", "title": "个人观点，不构成投资建议，仅供参考。投资有风险，入市需谨慎。#金价暴跌 #黄金大跌 #金价走势 #金价行情 #金价大涨"}
+{"ts": "2026-08-27T20:45:48.005265", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7678353799777455400"}
+{"ts": "2026-08-27T20:45:48.417875", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7678353799777455400", "reason": "already_processed"}
+{"ts": "2026-08-27T20:45:50.420423", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7677952548065578278"}
+{"ts": "2026-08-27T20:45:50.877896", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7677952548065578278", "reason": "already_processed"}
+{"ts": "2026-08-27T20:45:52.880447", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7677614654834691366"}
+{"ts": "2026-08-27T20:45:53.334297", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7677614654834691366", "reason": "already_processed"}
+{"ts": "2026-08-27T20:45:55.336866", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7676854579744541979"}
+{"ts": "2026-08-27T20:45:55.783231", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7676854579744541979", "reason": "already_processed"}
+{"ts": "2026-08-27T20:45:57.785814", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7675981583958183187"}
+{"ts": "2026-08-27T20:45:58.302294", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7675981583958183187", "reason": "already_processed"}
+{"ts": "2026-08-27T20:46:00.304931", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7675036892378762515"}
+{"ts": "2026-08-27T20:46:00.745906", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7675036892378762515", "reason": "already_processed"}
+{"ts": "2026-08-27T20:46:02.748482", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7671603007980670262"}
+{"ts": "2026-08-27T20:46:03.310080", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7671603007980670262", "reason": "already_processed"}
+{"ts": "2026-08-27T20:46:05.312631", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7670433406676733219"}
+{"ts": "2026-08-27T20:46:47.650626", "event": "success", "tag": "20260827_203255", "platform": "douyin", "video_id": "7670433406676733219", "title": "个人观点，不构成投资建议，仅供参考。投资有风险，入市需谨慎。#金价大涨 #黄金暴涨 #金价走势 #金价行情 #今日金价"}
+{"ts": "2026-08-27T20:46:49.653336", "event": "start", "tag": "20260827_203255", "platform": "douyin", "video_id": "7669753331060870406"}
+{"ts": "2026-08-27T20:46:50.133563", "event": "skipped", "tag": "20260827_203255", "platform": "douyin", "video_id": "7669753331060870406", "reason": "already_processed"}

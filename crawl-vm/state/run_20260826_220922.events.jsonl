@@ -1,0 +1,62 @@
+{"ts": "2026-08-26T22:09:22.956479", "event": "start", "tag": "20260826_220922", "platforms": "douyin"}
+{"ts": "2026-08-26T22:09:24.102645", "event": "start", "tag": "20260826_220922", "platform": "douyin", "video_id": "7103469551442038030"}
+{"ts": "2026-08-26T22:09:24.757750", "event": "skipped", "tag": "20260826_220922", "platform": "douyin", "video_id": "7103469551442038030", "reason": "already_processed"}
+{"ts": "2026-08-26T22:09:26.760153", "event": "start", "tag": "20260826_220922", "platform": "douyin", "video_id": "7678280661643414834"}
+{"ts": "2026-08-26T22:09:27.654341", "event": "skipped", "tag": "20260826_220922", "platform": "douyin", "video_id": "7678280661643414834", "reason": "already_processed"}
+{"ts": "2026-08-26T22:09:29.656771", "event": "start", "tag": "20260826_220922", "platform": "douyin", "video_id": "7677546608283700523"}
+{"ts": "2026-08-26T22:09:30.318109", "event": "skipped", "tag": "20260826_220922", "platform": "douyin", "video_id": "7677546608283700523", "reason": "already_processed"}
+{"ts": "2026-08-26T22:09:32.320519", "event": "start", "tag": "20260826_220922", "platform": "douyin", "video_id": "7677545966915915062"}
+{"ts": "2026-08-26T22:09:32.830160", "event": "skipped", "tag": "20260826_220922", "platform": "douyin", "video_id": "7677545966915915062", "reason": "already_processed"}
+{"ts": "2026-08-26T22:09:34.832294", "event": "start", "tag": "20260826_220922", "platform": "douyin", "video_id": "7676300858711198976"}
+{"ts": "2026-08-26T22:09:36.469983", "event": "skipped", "tag": "20260826_220922", "platform": "douyin", "video_id": "7676300858711198976", "reason": "already_processed"}
+{"ts": "2026-08-26T22:09:38.472399", "event": "start", "tag": "20260826_220922", "platform": "douyin", "video_id": "7676386602129558835"}
+{"ts": "2026-08-26T22:09:39.022606", "event": "skipped", "tag": "20260826_220922", "platform": "douyin", "video_id": "7676386602129558835", "reason": "already_processed"}
+{"ts": "2026-08-26T22:09:41.023224", "event": "start", "tag": "20260826_220922", "platform": "douyin", "video_id": "7676057507868986667"}
+{"ts": "2026-08-26T22:09:41.527408", "event": "skipped", "tag": "20260826_220922", "platform": "douyin", "video_id": "7676057507868986667", "reason": "already_processed"}
+{"ts": "2026-08-26T22:09:43.529837", "event": "start", "tag": "20260826_220922", "platform": "douyin", "video_id": "7675684533085146368"}
+{"ts": "2026-08-26T22:09:45.197816", "event": "skipped", "tag": "20260826_220922", "platform": "douyin", "video_id": "7675684533085146368", "reason": "already_processed"}
+{"ts": "2026-08-26T22:09:47.200244", "event": "start", "tag": "20260826_220922", "platform": "douyin", "video_id": "7675315413663665448"}
+{"ts": "2026-08-26T22:09:47.664552", "event": "skipped", "tag": "20260826_220922", "platform": "douyin", "video_id": "7675315413663665448", "reason": "already_processed"}
+{"ts": "2026-08-26T22:09:49.666963", "event": "start", "tag": "20260826_220922", "platform": "douyin", "video_id": "7673838499631615232"}
+{"ts": "2026-08-26T22:09:50.257544", "event": "skipped", "tag": "20260826_220922", "platform": "douyin", "video_id": "7673838499631615232", "reason": "already_processed"}
+{"ts": "2026-08-26T22:09:52.260009", "event": "start", "tag": "20260826_220922", "platform": "douyin", "video_id": "7673837588213402895"}
+{"ts": "2026-08-26T22:09:52.794036", "event": "skipped", "tag": "20260826_220922", "platform": "douyin", "video_id": "7673837588213402895", "reason": "already_processed"}
+{"ts": "2026-08-26T22:09:57.361615", "event": "start", "tag": "20260826_220922", "platform": "douyin", "video_id": "7054855328130747662"}
+{"ts": "2026-08-26T22:09:58.575822", "event": "skipped", "tag": "20260826_220922", "platform": "douyin", "video_id": "7054855328130747662", "reason": "already_processed"}
+{"ts": "2026-08-26T22:10:00.577418", "event": "start", "tag": "20260826_220922", "platform": "douyin", "video_id": "7061910077552233765"}
+{"ts": "2026-08-26T22:10:02.510769", "event": "skipped", "tag": "20260826_220922", "platform": "douyin", "video_id": "7061910077552233765", "reason": "already_processed"}
+{"ts": "2026-08-26T22:10:04.513144", "event": "start", "tag": "20260826_220922", "platform": "douyin", "video_id": "7675298378776335818"}
+{"ts": "2026-08-26T22:10:04.806994", "event": "failed", "tag": "20260826_220922", "platform": "douyin", "video_id": "7675298378776335818", "reason": "Expecting value: line 1 column 1 (char 0)"}
+{"ts": "2026-08-26T22:10:04.808355", "event": "start", "tag": "20260826_220922", "platform": "douyin", "video_id": "7674123386315199483"}
+{"ts": "2026-08-26T22:10:05.385350", "event": "skipped", "tag": "20260826_220922", "platform": "douyin", "video_id": "7674123386315199483", "reason": "already_processed"}
+{"ts": "2026-08-26T22:10:07.387781", "event": "start", "tag": "20260826_220922", "platform": "douyin", "video_id": "7674121881427908849"}
+{"ts": "2026-08-26T22:10:08.202112", "event": "skipped", "tag": "20260826_220922", "platform": "douyin", "video_id": "7674121881427908849", "reason": "already_processed"}
+{"ts": "2026-08-26T22:10:10.204444", "event": "start", "tag": "20260826_220922", "platform": "douyin", "video_id": "7672600204130036467"}
+{"ts": "2026-08-26T22:10:10.865811", "event": "skipped", "tag": "20260826_220922", "platform": "douyin", "video_id": "7672600204130036467", "reason": "already_processed"}
+{"ts": "2026-08-26T22:10:14.256237", "event": "start", "tag": "20260826_220922", "platform": "douyin", "video_id": "7448539659656793407"}
+{"ts": "2026-08-26T22:10:14.720406", "event": "skipped", "tag": "20260826_220922", "platform": "douyin", "video_id": "7448539659656793407", "reason": "already_processed"}
+{"ts": "2026-08-26T22:10:16.722751", "event": "start", "tag": "20260826_220922", "platform": "douyin", "video_id": "7435546933608975653"}
+{"ts": "2026-08-26T22:10:17.250167", "event": "skipped", "tag": "20260826_220922", "platform": "douyin", "video_id": "7435546933608975653", "reason": "already_processed"}
+{"ts": "2026-08-26T22:10:19.252608", "event": "start", "tag": "20260826_220922", "platform": "douyin", "video_id": "7415939977848180005"}
+{"ts": "2026-08-26T22:10:19.745696", "event": "skipped", "tag": "20260826_220922", "platform": "douyin", "video_id": "7415939977848180005", "reason": "already_processed"}
+{"ts": "2026-08-26T22:10:21.747821", "event": "start", "tag": "20260826_220922", "platform": "douyin", "video_id": "7678186182383539366"}
+{"ts": "2026-08-26T22:10:22.437737", "event": "skipped", "tag": "20260826_220922", "platform": "douyin", "video_id": "7678186182383539366", "reason": "already_processed"}
+{"ts": "2026-08-26T22:10:24.440192", "event": "start", "tag": "20260826_220922", "platform": "douyin", "video_id": "7677880300851959918"}
+{"ts": "2026-08-26T22:10:25.710690", "event": "skipped", "tag": "20260826_220922", "platform": "douyin", "video_id": "7677880300851959918", "reason": "already_processed"}
+{"ts": "2026-08-26T22:10:27.713135", "event": "start", "tag": "20260826_220922", "platform": "douyin", "video_id": "7677816329160700786"}
+{"ts": "2026-08-26T22:10:28.270470", "event": "skipped", "tag": "20260826_220922", "platform": "douyin", "video_id": "7677816329160700786", "reason": "already_processed"}
+{"ts": "2026-08-26T22:10:30.272911", "event": "start", "tag": "20260826_220922", "platform": "douyin", "video_id": "7677525532922636762"}
+{"ts": "2026-08-26T22:10:30.833109", "event": "skipped", "tag": "20260826_220922", "platform": "douyin", "video_id": "7677525532922636762", "reason": "already_processed"}
+{"ts": "2026-08-26T22:10:32.834948", "event": "start", "tag": "20260826_220922", "platform": "douyin", "video_id": "7677442409256633190"}
+{"ts": "2026-08-26T22:10:33.290790", "event": "skipped", "tag": "20260826_220922", "platform": "douyin", "video_id": "7677442409256633190", "reason": "already_processed"}
+{"ts": "2026-08-26T22:10:35.293212", "event": "start", "tag": "20260826_220922", "platform": "douyin", "video_id": "7676826178976494702"}
+{"ts": "2026-08-26T22:10:37.170447", "event": "skipped", "tag": "20260826_220922", "platform": "douyin", "video_id": "7676826178976494702", "reason": "already_processed"}
+{"ts": "2026-08-26T22:10:39.172916", "event": "start", "tag": "20260826_220922", "platform": "douyin", "video_id": "7676472737535367854"}
+{"ts": "2026-08-26T22:10:39.685994", "event": "skipped", "tag": "20260826_220922", "platform": "douyin", "video_id": "7676472737535367854", "reason": "already_processed"}
+{"ts": "2026-08-26T22:10:41.688404", "event": "start", "tag": "20260826_220922", "platform": "douyin", "video_id": "7676401252770714762"}
+{"ts": "2026-08-26T22:10:42.196207", "event": "skipped", "tag": "20260826_220922", "platform": "douyin", "video_id": "7676401252770714762", "reason": "already_processed"}
+{"ts": "2026-08-26T22:10:44.198635", "event": "start", "tag": "20260826_220922", "platform": "douyin", "video_id": "7676329023824263090"}
+{"ts": "2026-08-26T22:10:46.098243", "event": "skipped", "tag": "20260826_220922", "platform": "douyin", "video_id": "7676329023824263090", "reason": "already_processed"}
+{"ts": "2026-08-26T22:10:48.100693", "event": "start", "tag": "20260826_220922", "platform": "douyin", "video_id": "7676084983652081755"}
+{"ts": "2026-08-26T22:10:49.617035", "event": "skipped", "tag": "20260826_220922", "platform": "douyin", "video_id": "7676084983652081755", "reason": "already_processed"}
+{"ts": "2026-08-26T22:10:51.619851", "event": "complete", "tag": "20260826_220922"}
