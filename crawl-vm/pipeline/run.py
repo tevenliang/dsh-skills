@@ -381,7 +381,7 @@ async def run_platform(platform: str, config: dict, publisher: VaultPublisher,
             # 从博主获取视频列表
             for author_id in author_ids:
                 print(f"\nFetching videos for author: {author_id}")
-                videos = await crawler.get_user_videos(sec_user_id=author_id)
+                videos = await crawler.get_user_videos(sec_user_id=author_id) or []
                 print(f"  Found {len(videos)} videos")
                 
                 processed = 0
@@ -408,7 +408,7 @@ async def run_platform(platform: str, config: dict, publisher: VaultPublisher,
             # 从博主获取视频列表
             for mid in author_ids:
                 print(f"\nFetching videos for author mid: {mid}")
-                videos = await crawler.get_user_videos(int(mid))
+                videos = await crawler.get_user_videos(int(mid)) or []
                 print(f"  Found {len(videos)} videos")
                 
                 processed = 0
@@ -504,16 +504,24 @@ async def main():
             video_ids=video_ids, author_ids=author_ids
         )
     
-    # 生成每日 index
-    date_str = datetime.now().strftime("%m%d")
-    publisher.generate_daily_index(date_str)
-    
-    logger.log("complete")
-    print(f"\n{'='*50}")
-    print(f"crawl-vm completed!")
-    print(f"Events logged to: {logger.event_file}")
-    print(f"{'='*50}")
+    # 生成每日 index（即使平台阶段报错也要尝试生成，保障索引不缺失）
+    try:
+        date_str = datetime.now().strftime("%m%d")
+        publisher.generate_daily_index(date_str)
+        logger.log("complete")
+        print(f"\n{'='*50}")
+        print(f"crawl-vm completed!")
+        print(f"Events logged to: {logger.event_file}")
+        print(f"{'='*50}")
+    except Exception as e:
+        print(f"\n[WARNING] index 生成失败: {e}")
+        logger.log("complete", error=str(e))
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        print(f"\n[ERROR] crawl-vm 主流程异常: {e}")

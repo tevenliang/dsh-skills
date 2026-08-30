@@ -2,7 +2,7 @@
 from pathlib import Path
 import sys
 
-ABOGUS_PATH = Path.home() / ".agents/skills/crawl/ingest-douyin/douyin_api/crawlers/douyin/web/abogus.py"
+ABOGUS_PATH = Path.home() / ".dsh/skills/crawl/ingest-douyin/douyin_api/crawlers/douyin/web/abogus.py"
 print(f"ABOGUS_PATH: {ABOGUS_PATH}")
 print(f"ABOGUS_PATH.parent: {ABOGUS_PATH.parent}")
 print(f"Exists: {ABOGUS_PATH.exists()}")

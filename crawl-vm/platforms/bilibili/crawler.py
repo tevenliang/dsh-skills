@@ -17,7 +17,7 @@ import httpx
 
 
 # WBI keys 模块路径
-WBI_KEYS_PATH = Path.home() / ".agents" / "skills" / "crawl" / "ingest-douyin" / "douyin_api" / "crawlers" / "bilibili" / "web" / "wbi_keys.py"
+WBI_KEYS_PATH = Path.home() / ".dsh" / "skills" / "crawl" / "ingest-douyin" / "douyin_api" / "crawlers" / "bilibili" / "web" / "wbi_keys.py"
 
 
 class BilibiliCrawler:
@@ -73,7 +73,7 @@ class BilibiliCrawler:
     
     async def _fetch_nav(self) -> dict:
         """获取 nav 信息（包含用户信息和 mixin_key）"""
-        async with httpx.AsyncClient(proxy=self.proxy, timeout=15) as client:
+        async with httpx.AsyncClient(proxy=self.proxy, timeout=15, verify=False) as client:
             resp = await client.get(
                 "https://api.bilibili.com/x/web-interface/nav",
                 headers=self.headers
@@ -101,7 +101,7 @@ class BilibiliCrawler:
         """
         await self.ensure_mixin_key()
         
-        async with httpx.AsyncClient(proxy=self.proxy, timeout=15) as client:
+        async with httpx.AsyncClient(proxy=self.proxy, timeout=15, verify=False) as client:
             resp = await client.get(
                 f"https://api.bilibili.com/x/web-interface/view?bvid={bvid}",
                 headers=self.headers
@@ -140,7 +140,7 @@ class BilibiliCrawler:
         params['w_rid'] = w_rid
         params['wts'] = str(int(time.time()))
         
-        async with httpx.AsyncClient(proxy=self.proxy, timeout=15) as client:
+        async with httpx.AsyncClient(proxy=self.proxy, timeout=15, verify=False) as client:
             resp = await client.get(
                 "https://api.bilibili.com/x/player/playurl",
                 headers=self.headers,
@@ -193,7 +193,7 @@ class BilibiliCrawler:
         params['w_rid'] = w_rid
         params['wts'] = str(int(time.time()))
         
-        async with httpx.AsyncClient(proxy=self.proxy, timeout=15) as client:
+        async with httpx.AsyncClient(proxy=self.proxy, timeout=15, verify=False) as client:
             resp = await client.get(
                 "https://api.bilibili.com/x/space/wbi/arc/search",
                 headers=self.headers,
@@ -205,7 +205,7 @@ class BilibiliCrawler:
             print(f"    [bilibili] get_user_videos failed: code={data.get('code')}, msg={data.get('message', '')}")
             return []
         
-        vlist = data.get("data", {}).get("list", {}).get("vlist", [])
+        vlist = (data.get("data") or {}).get("list", {}).get("vlist") or []
         return vlist
     
     def parse_video_info(self, video_data: Dict) -> Dict:

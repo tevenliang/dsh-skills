@@ -7,8 +7,20 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" >/dev/null 2>&1 && pwd)"
 SKILL_DIR="$SCRIPT_DIR"
 
-# Python 路径
-PYTHON="$HOME/.agents/skills/crawl/.venv/bin/python3"
+# Python 路径（优先用 dsh 环境的 venv，不依赖已删除的旧 crawl venv）
+# 如果 dsh venv 不存在则用系统 Python
+if [ -x "/home/ubuntu/.dsh/.venv/bin/python3" ]; then
+    PYTHON="/home/ubuntu/.dsh/.venv/bin/python3"
+elif [ -x "/usr/bin/python3" ]; then
+    PYTHON="/usr/bin/python3"
+else
+    echo "❌ 找不到可用 Python" >&2; exit 1
+fi
+
+# 显式指定 SSL 证书文件，防止 certifi.where() 在某些环境下返回无效路径
+# （特别重要：通过 VPN 代理访问 HTTPS 时 httpx 需要正确的 CA bundle）
+export SSL_CERT_FILE="/etc/ssl/certs/ca-certificates.crt"
+export SSL_CERT_DIR="/etc/ssl/certs"
 
 # 默认参数
 PLATFORMS="all"

@@ -16,7 +16,7 @@ import httpx
 
 
 # a_bogus 签名模块路径
-ABOGUS_PATH = Path.home() / ".agents" / "skills" / "crawl" / "ingest-douyin" / "douyin_api" / "crawlers" / "douyin" / "web" / "abogus.py"
+ABOGUS_PATH = Path.home() / ".dsh" / "skills" / "crawl" / "ingest-douyin" / "douyin_api" / "crawlers" / "douyin" / "web" / "abogus.py"
 
 
 class DouyinCrawler:
@@ -109,7 +109,7 @@ class DouyinCrawler:
             print(f"    [douyin] get_user_videos failed: {data.get('status_code')}")
             return []
         
-        aweme_list = data.get("aweme_list", [])
+        aweme_list = data.get("aweme_list") or []
         return aweme_list
     
     def get_audio_url(self, aweme_detail: Dict) -> Optional[str]:
