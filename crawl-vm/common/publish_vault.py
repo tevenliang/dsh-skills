@@ -19,11 +19,9 @@ class VaultPublisher:
     def __init__(self, vault_root: Path):
         self.vault_root = Path(vault_root)
         self.subscription_dir = self.vault_root / "subscription"
-        self.notes_dir = self.vault_root / "notes"
         
         # 确保目录存在
         self.subscription_dir.mkdir(parents=True, exist_ok=True)
-        self.notes_dir.mkdir(parents=True, exist_ok=True)
     
     def generate_daily_index(self, date_str: str = None):
         """生成每日 index.md，按作者聚合所有平台的笔记
@@ -42,7 +40,7 @@ class VaultPublisher:
         all_notes = []  # (platform, author, note_file, title)
         
         for platform in ['douyin', 'bilibili']:
-            platform_notes = self.notes_dir / platform
+            platform_notes = self.subscription_dir / platform
             if not platform_notes.exists():
                 continue
             
@@ -98,9 +96,9 @@ class VaultPublisher:
             for author, notes in sorted(by_author.items()):
                 content_lines.append(f"## {author}\n")
                 for note_file, title in notes:
-                    # 使用 notes/ 目录的路径 (crawl-vm 的笔记位置)
+                    # 使用 subscription/ 目录的路径
                     content_lines.append(f"### {title}\n")
-                    content_lines.append(f"![[notes/{platform}/{note_file}]]\n\n")
+                    content_lines.append(f"![[subscription/{platform}/{note_file}]]\n\n")
                 content_lines.append("\n")
         
         index_content = "\n".join(content_lines)
@@ -138,16 +136,23 @@ class VaultPublisher:
         if tags is None:
             tags = []
         
-        # 清理标题用于文件名
-        safe_title = sanitize_filename(title, max_len=30)
-        date_str = datetime.now().strftime("%m%d")
+        # 清理标题/ID 用于文件名；把视频ID也加进文件名，避免"无标题"等同名视频互相覆盖
+        safe_id = sanitize_filename(str(video_id), max_bytes=30)
+        safe_title = sanitize_filename(title, max_bytes=150)
         
-        # 平台笔记目录
-        platform_notes = self.notes_dir / platform
+        # 确定日期：如果传入了 publish_date（YYYY-MM-DD 格式），使用它；否则用当前时间
+        if publish_date and len(publish_date) >= 10:
+            # publish_date 格式: 2026-08-28，取月日部分
+            date_str = publish_date[5:7] + publish_date[8:10]  # "0828"
+        else:
+            date_str = datetime.now().strftime("%m%d")
+        
+        # 平台笔记目录 (在 subscription 下)
+        platform_notes = self.subscription_dir / platform
         platform_notes.mkdir(parents=True, exist_ok=True)
         
-        # 单条笔记文件
-        note_file = platform_notes / f"{date_str}-{safe_title}.md"
+        # 单条笔记文件（含 video_id 防重名）
+        note_file = platform_notes / f"{date_str}-{safe_id}-{safe_title}.md"
         
         # 如果文件已存在，先备份（避免重复写入）
         if note_file.exists():
@@ -278,13 +283,13 @@ tags: [{tags_str}]
     
     def is_processed(self, platform: str, video_id: str) -> bool:
         """检查视频是否已处理"""
-        # 检查 notes 目录
-        notes_dir = self.notes_dir / platform
-        if not notes_dir.exists():
+        # 检查 subscription 目录
+        platform_dir = self.subscription_dir / platform
+        if not platform_dir.exists():
             return False
         
         # 简单检查：搜索文件中是否包含该 video_id
-        for md_file in notes_dir.glob("*.md"):
+        for md_file in platform_dir.glob("*.md"):
             try:
                 content = md_file.read_text(encoding='utf-8')
                 if video_id in content or f"video/{video_id}" in content:

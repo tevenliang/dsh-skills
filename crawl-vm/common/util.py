@@ -11,15 +11,41 @@ from datetime import datetime
 from typing import Optional
 
 
-def sanitize_filename(name: str, max_len: int = 50) -> str:
-    """将字符串转换为安全的文件名"""
-    # 替换非法字符
-    name = re.sub(r'[<>:"/\\|?*]', '_', name)
+def truncate_bytes(s: str, max_bytes: int) -> str:
+    """按字节截断字符串（UTF-8 边界安全），不破坏多字节字符。
+
+    Args:
+        s: 输入字符串
+        max_bytes: 最大字节数
+
+    Returns:
+        截断后的字符串，确保 encoded bytes <= max_bytes
+    """
+    b = s.encode('utf-8')
+    if len(b) <= max_bytes:
+        return s
+    # 回退到最后一个完整 UTF-8 字符边界
+    cut = max_bytes
+    while cut > 0 and (b[cut] & 0xC0) == 0x80:
+        cut -= 1
+    return b[:cut].decode('utf-8', errors='replace')
+
+
+def sanitize_filename(name: str, max_bytes: int = 50) -> str:
+    """将字符串转换为安全的文件名（字节安全截断版本）。
+
+    剔除会破坏 Obsidian 双链解析的字符：
+    # 是标题锚点、| 是别名分隔、^ 是块引用、[ ] 是链接括号。
+    """
+    # 先移除 #（话题标签），避免文件名里出现锚点符号
+    name = name.replace('#', '')
+    # 替换其它非法/特殊字符
+    name = re.sub(r'[<>:"/\\|?*^\[\]]', '_', name)
     # 移除多余空格
     name = re.sub(r'\s+', '_', name.strip())
-    # 截断
-    if len(name) > max_len:
-        name = name[:max_len]
+    # 按字节安全截断（max_bytes 参数语义已变更为字节数）
+    if len(name.encode('utf-8')) > max_bytes:
+        name = truncate_bytes(name, max_bytes)
     return name
 
 
