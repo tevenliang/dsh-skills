@@ -47,7 +47,7 @@ def load_config() -> dict:
 def load_cookie(platform: str, config: dict) -> str:
     """加载 Cookie"""
     if platform == "douyin":
-        # 从 douyin config.yaml 读取
+        # 从 douyin config.yaml 读取 (新仓库位置)
         cookie_config_path = Path(config["platforms"]["douyin"]["cookie_config"])
         import yaml
         cookie_config = yaml.safe_load(cookie_config_path.read_text(encoding='utf-8'))

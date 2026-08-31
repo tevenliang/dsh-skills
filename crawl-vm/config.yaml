@@ -12,7 +12,7 @@ platforms:
     enabled: true
     cookie_file: /home/ubuntu/.agents/credentials/ominicrawl/douyin.txt
     # Cookie 从 config.yaml 的 TokenManager 段读取
-    cookie_config: /home/ubuntu/.agents/skills/crawl/ingest-douyin/douyin_api/crawlers/douyin/web/config.yaml
+    cookie_config: /home/ubuntu/.dsh/skills/crawl/ingest-douyin/douyin_api/crawlers/douyin/web/config.yaml
   bilibili:
     enabled: true
     cookie_file: /home/ubuntu/.agents/credentials/ominicrawl/bilibili.txt
