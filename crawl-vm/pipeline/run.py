@@ -93,6 +93,69 @@ class EventLogger:
         print(f"  [{event}] {kwargs}")
 
 
+def _extract_title_from_transcript(transcript: str, author: str = "") -> str:
+    """从转录文本提取一句话作为标题 (抖音无 desc 视频)
+
+    策略:
+    1. 去掉开头无意义的语气词/停顿词
+    2. 取第一句 (按 。！？!?<br>换行截断)
+    3. 过长则用逗号断 (转录常无句号)
+    4. 截取最多 40 字符
+    """
+    import re
+    text = transcript.strip()
+    if not text:
+        return ""
+    
+    LEADING_NOISE = [
+        "诶呀", "哎呀", "呃", "嗯", "啊", "这个", "那个", "就是说",
+        "其实", "然后", "好了", "接下来", "今天吧", "我们先", "大家知道",
+        "朋友们", "大家好", "哈喽", "hello", "hi", "em", "eh",
+    ]
+    
+    cleaned = text
+    # 最多去 3 轮语气词
+    for _ in range(3):
+        changed = False
+        for noise in sorted(LEADING_NOISE, key=len, reverse=True):
+            if cleaned.startswith(noise):
+                cleaned = cleaned[len(noise):]
+                changed = True
+                break
+        if not changed:
+            break
+    # 去掉此后开头的标点/空格
+    cleaned = re.sub(r'^[,，.。!！?？;；:\s]+', '', cleaned)
+    
+    # 取第一句
+    first_sentence = re.split(r'[。！？!?;；\n]', cleaned)[0].strip()
+    
+    # 过长 (转录常无句号): 用逗号/顿号切, 目标 8-30 字符
+    if len(first_sentence) > 30:
+        parts = re.split(r'[,，]', first_sentence)
+        acc = ""
+        for p in parts:
+            if len(acc) + len(p) + 1 <= 30:
+                acc += p + ","
+            else:
+                break
+        first_sentence = acc.rstrip(",") if len(acc) >= 8 else first_sentence[:30]
+    
+    # 去掉尾部悬空标点 + #话题 + emoji
+    first_sentence = re.sub(r'[,，.。:：\s]+$', '', first_sentence)
+    first_sentence = re.sub(r'#\S+$', '', first_sentence).strip()
+    first_sentence = re.sub(r'[\U0001F300-\U0001FAFF\U000026A0-\U000027BF]', '', first_sentence)
+    
+    # 截断 40 字符
+    if len(first_sentence) > 40:
+        first_sentence = first_sentence[:40].rstrip()
+    if len(first_sentence.strip()) < 3:
+        # fallback: 前 30 字符
+        first_sentence = transcript.strip()[:30]
+    
+    return first_sentence.strip()
+
+
 async def process_douyin_video(crawler: DouyinCrawler, aweme_id: str, publisher: VaultPublisher, 
                                transcribe: TranscriptionService, summarize: SummarizationService,
                                logger: EventLogger, config: dict):
@@ -192,13 +255,20 @@ async def process_douyin_video(crawler: DouyinCrawler, aweme_id: str, publisher:
             
             print(f"    Transcript: {len(transcript)} chars")
             
-            # 7. 总结
+            # 7. 如果 desc 为空 (标题是 video_id), 从转录文本提取标题
+            if info["title"] == str(aweme_id) or not info["title"].strip():
+                from_title = _extract_title_from_transcript(transcript, info["author"])
+                if from_title:
+                    print(f"    Title from transcript: {from_title[:40]}")
+                    info["title"] = from_title
+            
+            # 8. 总结
             print(f"    Summarizing...")
             summary = summarize.summarize(transcript)
             if summary:
                 print(f"    Summary: {len(summary)} chars")
             
-            # 8. 发布
+            # 9. 发布
             print(f"    Publishing...")
             note_file = publisher.publish(
                 platform="douyin",
