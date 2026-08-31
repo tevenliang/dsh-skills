@@ -148,9 +148,13 @@ class DouyinCrawler:
     
     def parse_video_info(self, aweme_detail: Dict) -> Dict:
         """解析视频信息"""
+        video_id = aweme_detail.get("aweme_id", "") or ""
+        desc = aweme_detail.get("desc", "") or ""
+        # Douyin 视频 desc 为空时，用视频 ID 作为唯一标识（避免"无标题"乱码）
+        title = desc if desc.strip() else video_id
         return {
-            "video_id": aweme_detail.get("aweme_id", ""),
-            "title": aweme_detail.get("desc", "") or "无标题",
+            "video_id": video_id,
+            "title": title,
             "author": aweme_detail.get("author", {}).get("nickname", "未知作者"),
             "author_id": aweme_detail.get("author", {}).get("sec_uid", ""),
             "duration_ms": aweme_detail.get("video", {}).get("duration", 0) or 0,

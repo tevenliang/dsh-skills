@@ -1,15 +1,16 @@
 #!/bin/bash
 # crawl-vm 入口脚本
-# 用法: ./run.sh [douyin|bilibili|all] [选项]
+# 用法: ./run.sh [douyin|bilibili|xiaohongshu|all] [选项]
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" >/dev/null 2>&1 && pwd)"
 SKILL_DIR="$SCRIPT_DIR"
 
-# Python 路径（优先用 dsh 环境的 venv，不依赖已删除的旧 crawl venv）
-# 如果 dsh venv 不存在则用系统 Python
-if [ -x "/home/ubuntu/.dsh/.venv/bin/python3" ]; then
+# Python 路径（优先用 crawl-vm 自带 venv，含 xhshow/curl_cffi）
+if [ -x "/home/ubuntu/.dsh/skills/crawl-vm/.venv/bin/python3" ]; then
+    PYTHON="/home/ubuntu/.dsh/skills/crawl-vm/.venv/bin/python3"
+elif [ -x "/home/ubuntu/.dsh/.venv/bin/python3" ]; then
     PYTHON="/home/ubuntu/.dsh/.venv/bin/python3"
 elif [ -x "/usr/bin/python3" ]; then
     PYTHON="/usr/bin/python3"
@@ -52,6 +53,14 @@ while [[ $# -gt 0 ]]; do
             BILIBILI_AUTHORS="${*:2}"
             shift $#
             ;;
+        --xiaohongshu-authors)
+            XIAOHONGSHU_AUTHORS="${*:2}"
+            shift $#
+            ;;
+        --xiaohongshu-ids)
+            XIAOHONGSHU_IDS="${*:2}"
+            shift $#
+            ;;
         *)
             shift
             ;;
@@ -65,6 +74,12 @@ case $CMD in
   bilibili)
     PLATFORMS="bilibili"
     ;;
+  xiaohongshu)
+    PLATFORMS="xiaohongshu"
+    ;;
+  xhs)
+    PLATFORMS="xiaohongshu"
+    ;;
   all)
     PLATFORMS="all"
     ;;
@@ -74,9 +89,10 @@ case $CMD in
     echo "用法: ./run.sh <命令> [选项]"
     echo ""
     echo "命令:"
-    echo "  douyin     只爬取抖音"
-    echo "  bilibili   只爬取 B站"
-    echo "  all        爬取所有平台 (默认)"
+    echo "  douyin       只爬取抖音"
+    echo "  bilibili     只爬取 B站"
+    echo "  xiaohongshu  只爬取小红书 (别名 xhs)"
+    echo "  all          爬取所有平台 (默认)"
     echo ""
     echo "选项:"
     echo "  --date YYYYMMDD              指定日期"
@@ -84,12 +100,13 @@ case $CMD in
     echo "  --bilibili-ids ID [ID...]    指定 B站视频 BV 号"
     echo "  --douyin-authors ID [ID...]  指定抖音博主 sec_uid"
     echo "  --bilibili-authors ID [ID...] 指定 B站博主 mid"
+    echo "  --xiaohongshu-authors ID [ID...] 指定小红书博主 user_id"
     echo ""
     echo "示例:"
     echo "  ./run.sh all                          # 爬取所有平台的 watchlist"
     echo "  ./run.sh douyin --douyin-ids 7673836885130661158"
     echo "  ./run.sh bilibili --bilibili-ids BV1xx411c7mu"
-    echo "  ./run.sh douyin --douyin-authors <sec_uid>"
+    echo "  ./run.sh xiaohongshu --xiaohongshu-authors 5f92b728..."
     exit 0
     ;;
 esac
@@ -113,10 +130,19 @@ if [[ -n "$BILIBILI_AUTHORS" ]]; then
     CMD_ARGS="$CMD_ARGS --bilibili-authors $BILIBILI_AUTHORS"
 fi
 
-echo "🚀 crawl-vm 启动"
+if [[ -n "$XIAOHONGSHU_AUTHORS" ]]; then
+    CMD_ARGS="$CMD_ARGS --xiaohongshu-authors $XIAOHONGSHU_AUTHORS"
+fi
+
+if [[ -n "$XIAOHONGSHU_IDS" ]]; then
+    CMD_ARGS="$CMD_ARGS --xiaohongshu-ids $XIAOHONGSHU_IDS"
+fi
+
+echo "🚀 crawl-vm 启动 (supervised)"
 echo "  platforms: $PLATFORMS"
 echo "  date: $DATE"
 
-# 运行
+# 运行（走 supervisor 守护: ActionMonitor 监控 active item 卡死并自动 kill,
+#       实时解析 stdout, 维护 state/supervisor.json 供轮询）
 cd "$SKILL_DIR"
-$PYTHON -m pipeline.run $CMD_ARGS
+$PYTHON -m common_supervisor.supervisor --sub $PYTHON -m pipeline.run $CMD_ARGS

@@ -18,7 +18,7 @@ from typing import List, Optional
 class Author:
     platform: str
     name: str
-    author_id: str  # mid (B站) 或 sec_user_id (抖音)
+    author_id: str  # mid (B站) / sec_user_id (抖音) / user_id (小红书)
     remark: str = ""
 
 
@@ -47,6 +47,21 @@ def extract_bilibili_mid(url: str) -> Optional[str]:
     m = re.search(r'space\.bilibili\.com/(\d+)', url)
     if m:
         return m.group(1)
+    return None
+
+
+def extract_xiaohongshu_user_id(url: str) -> Optional[str]:
+    """从小红书用户主页 URL 提取 user_id
+    
+    URL 格式: https://www.xiaohongshu.com/user/profile/{user_id}
+    user_id 是 24 位十六进制字符串, 如 5f92b728000000000101d9f7
+    """
+    m = re.search(r'xiaohongshu\.com/user/profile/([a-f0-9]{24})', url)
+    if m:
+        return m.group(1)
+    # 直接是 user_id 的情况
+    if len(url) == 24 and re.match(r'^[a-f0-9]{24}$', url):
+        return url
     return None
 
 
@@ -81,6 +96,9 @@ def parse_watchlist(vault_root: Path) -> List[Author]:
                 in_table = False
             elif 'bili' in line_stripped.lower():
                 current_platform = 'bilibili'
+                in_table = False
+            elif '小红书' in line_stripped or 'xhs' in line_stripped.lower() or 'xiaohongshu' in line_stripped.lower():
+                current_platform = 'xiaohongshu'
                 in_table = False
             else:
                 current_platform = None
@@ -144,6 +162,28 @@ def parse_watchlist(vault_root: Path) -> List[Author]:
             
             authors.append(Author(
                 platform='bilibili',
+                name=name,
+                author_id=author_id,
+                remark=category,
+            ))
+
+        elif current_platform == 'xiaohongshu':
+            # 格式: | 博主 | 分类 | URL |
+            # URL 格式: https://www.xiaohongshu.com/user/profile/{user_id}
+            if len(parts) < 4:
+                continue
+            
+            name = parts[1]
+            category = parts[2]
+            url = parts[3]
+            
+            if name in ('博主', '---') or not name:
+                continue
+            
+            author_id = extract_xiaohongshu_user_id(url) or ""
+            
+            authors.append(Author(
+                platform='xiaohongshu',
                 name=name,
                 author_id=author_id,
                 remark=category,

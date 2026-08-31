@@ -16,6 +16,9 @@ platforms:
   bilibili:
     enabled: true
     cookie_file: /home/ubuntu/.agents/credentials/ominicrawl/bilibili.txt
+  xiaohongshu:
+    enabled: true
+    cookie_file: /home/ubuntu/.agents/credentials/ominicrawl/xiaohongshu.txt
 
 # 转录配置 (Groq Whisper)
 transcription:
