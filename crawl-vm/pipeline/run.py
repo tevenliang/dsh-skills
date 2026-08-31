@@ -261,8 +261,8 @@ async def process_bilibili_video(crawler: BilibiliCrawler, bvid: str, publisher:
         if not audio_url:
             print(f"    No audio URL found")
             logger.log("failed", platform="bilibili", video_id=bvid, reason="no_audio_url")
-            return False
-        
+            return False, False
+
         # 4. 下载音频 (带重试)
         with tempfile.TemporaryDirectory() as tmpdir:
             m4a_path = Path(tmpdir) / f"{bvid}.m4a"
