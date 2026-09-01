@@ -4,3 +4,8 @@ __pycache__/
 *.pyc
 .pytest_cache/
 *.egg-info/
+# 本地运行环境（不应进入仓库）
+.venv/
+state/
+*.events.jsonl
+_bootstrap.py
