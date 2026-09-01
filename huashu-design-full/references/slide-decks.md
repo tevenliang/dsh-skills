@@ -235,6 +235,23 @@ moxt philosophy 页第一版用 2×2 = 4 段 + 底部 3 信条 = 7 块内容，�
 
 **默认走多文件路径**。它不是「备选」，是**长 deck 和团队协作的主路径**。原因：单文件架构的每一个优势（键盘导航、打印、scale）多文件都有，而多文件的作用域隔离和可验证性是单文件补不回来的。
 
+### 🔴 叠加约束：交付要经 WebDAV / 侧边栏预览 → 必须自包含单文件（2026-09-01 实测铁律）
+
+**多文件架构经认证 WebDAV 预览会全部空白 forbidden。** `deck_index.html` 用 **iframe** 加载 `slides/*.html` 子页面。当 deck 放在带认证的 WebDAV（如 wsgidav + basic auth，经 Caddy/cloudflared 反代，`https://dav.*`）或 DSH 侧边栏预览时：
+
+- `index.html` 本身能开（浏览器带了认证）
+- 但 **iframe 是匿名请求，无法携带 WebDAV basic auth** → 服务器对子页面返回 `401` → **每一页都空白/forbidden**，概览墙只剩空壳
+
+单文件自包含（全部 slide 内容内嵌一个 HTML，**零 iframe**）则无此问题，因为只打开一个 URL，无外部子页面要加载。
+
+**判断标准（开工先问一句）**：这个 deck 会不会被放到 WebDAV / 侧边栏 / 需要认证的预览环境？
+- **会** → **必须产出自包含单文件版本**（哪怕多页，也把 `<section>` 全部内嵌一个文件），即便要牺牲概览墙；
+- **不会**（本地双击 / 无认证静态服务器）→ 多文件概览墙随便用。
+
+**实测证据**（2026-09-01）：`/huashu-design/test-deck/index.html`（多文件，14 个 iframe 引用 slides/*.html）经 WebDAV 预览 forbidden；同内容的 `index-single.html`（自包含，零 iframe）预览正常。对比参照 `dashi-ppt/ppt/index.html`（自包含，636KB）一直正常。
+
+**两条都给的稳妥做法**：默认产多文件概览墙（开发/本地演讲用），**再额外并出一个自包含单文件版**（`scripts/merge_deck_single.py`）供 WebDAV/侧边栏预览。单文件版不丢任何 slide 内容，只丢 3D 概览墙。合并脚本见 `scripts/merge_deck_single.py` & 下方的「合并多文件→自包含单文件」小节。
+
 ### 为什么这条规则这么硬？（真实事故记录）
 
 单文件架构曾经在 AI心理学讲座 deck 制作中连踩四坑：
@@ -353,6 +370,26 @@ Playwright 截图也是直接 `goto(file://.../slides/05-personas.html)`，不�
 - `.page-header` / `.page-footer` 这种每页都用一模一样的 chrome
 
 **不要**把单页的布局 class 塞进来——那会退化回单文件架构的全局污染问题。
+
+### 合并多文件 → 自包含单文件（WebDAV/侧边栏预览的救兵）
+
+**场景**：多文件 deck 已经做完，但交付要经 WebDAV / DSH 侧边栏 / 带认证预览环境。多文件版 iframe 加载 slides 会全部 401 forbidden（见上方「叠加约束」白字节）。不用重做，一行命令并出单文件：
+
+```bash
+python3 scripts/merge_deck_single.py --index 项目/index.html \
+    --out 项目/index-single.html --badge "🧪 预览版"
+```
+
+- 自动读 `window.DECK_MANIFEST` → 逐页提取 `<body>` 内容包成 `<section class="slide">` + 合并全部 `<style>`
+- 输出零 iframe 自包含单文件（带 auto-scale 1920×1080 + 键盘/点击翻页 + 页码 + localStorage + 打印）
+- `--with-sitehead` 保留原 index 的 `<head>` 外部资源引用（Google Fonts 等）
+- `..//shared/*.css` 的 `@import` 会被尝试内联；含 `@font-face` 的字体文件会警告（字体需另内嵌 base64）
+
+**合并版与概览墙版的取舍**：
+- ✅ 保住全部 slide 内容，WebDAV/侧边栏预览不再 forbidden
+- ❌ 失去 3D 概览墙（网格/画廊）；全局样式合并后若有 class 撞名需手动 scope
+
+**验证**：合并后 `grep -c "<iframe" 输出` 应为 **0**；逐页检查 `--badge` 徽标与页码计数正常。
 
 ---
 

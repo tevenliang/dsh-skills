@@ -407,6 +407,7 @@ disable-model-invocation: true
 - 🔴 **默认且强烈推荐：多文件 + 概览墙**（几乎所有 PPT——培训/路演/科普/课件/汇报）→ 每页独立 HTML + `assets/deck_index.html` 拼接器。**这是 PPT 的默认交付形态**：自带**两种自适应 3D 概览**（网格 iframe / 无限画廊图片，按秒数 60/40 随机）+ 任意页数自适应（少页倾斜居中、多页舒适大卡滚动）+ 统一页码。**直接用，别重写概览**（倾斜/点击命中/裁切三个坑已内建解决，见 slide-decks.md）。
 - **单文件**（仅 ≤5 页极简 pitch、且明确不需要概览墙、或需跨页共享 JS 状态）→ `assets/deck_stage.js`。
 - 🛑 **不要默认选单文件而绕过概览墙**——北大 13 页 deck 实测踩坑：选了单文件 = 丢了概览墙，违背 PPT 默认交付形态。选单文件前先确认「这真的是 ≤5 页、且不需要概览墙」。
+- 🔴 **叠加铁律（2026-09-01 实测）**：交付要经 **WebDAV / DSH 侧边栏 / 任何带认证的预览环境** → **必须产出自包含单文件版**（全部 `<section>` 内嵌一个文件、零 iframe），否则 `deck_index.html` 的 iframe 匿名加载 `slides/*.html` 会被认证拦成 `401` → **每页空白 forbidden，概览墙只剩空壳**。本地双击/无认证静态服务器则不受限。稳妥做法：多文件概览墙（开发/本地演讲）+ `scripts/merge_deck_single.py` 并出单文件版（供 WebDAV/侧边栏预览）。完整决策树与实测见 slide-decks.md「叠加约束：交付要经 WebDAV / 侧边栏预览」。
 
 先读 `references/slide-decks.md` 的「🛑 先定架构」一节，错了会反复踩 CSS 特异性/作用域的坑。
 
@@ -419,6 +420,7 @@ disable-model-invocation: true
 | `deck_index.html` | **幻灯片的默认基础产物** | **直接复制为 `index.html`、编辑 MANIFEST 即用，不要重写概览逻辑**（三个坑已内建解决）。自带两种自适应概览（网格 iframe 60% / 画廊 40%，画廊需 `thumb` 字段 + 先跑 `scripts/gen_deck_thumbs.mjs`）+ 键盘翻页 + scale + 计数器 + 打印合并。要改先读 `references/slide-decks.md` 三条硬约束 |
 | `scripts/gen_deck_thumbs.mjs` | **给无限画廊概览生成缩略图**（网格 iframe 模式不需要）| playwright 截每页 + sharp 降采样 1600px JPEG：`npm i playwright sharp && node gen_deck_thumbs.mjs --slides slides --out thumbs`，再给 MANIFEST 每项加 `thumb`。分辨率别 <1000px 否则 hover 发虚 |
 | `deck_stage.js` | 做幻灯片（单文件架构，≤10页） | web component：auto-scale + 键盘导航 + slide counter + localStorage + speaker notes ⚠️ **script 必须放在 `</deck-stage>` 之后，section 的 `display: flex` 必须写到 `.active` 上**，详见 `references/slide-decks.md` 的两个硬约束 |
+| `deck_single_selfcontained.html` | **要经 WebDAV/侧边栏/带认证预览的自包含单文件 deck（2026-09-01）** | 所有页 `<section class="slide">` 内嵌一个文件、零 iframe → 预览不触发 WebDAV 401（多文件概览墙会 forbidden）。已内建 auto-scale 1920x1080 + 键盘/点击翻页 + 页码 + localStorage + 打印。用 `scripts/merge_deck_single.py` 从多文件 deck 自动并出。**铁律背景见 slide-decks.md「叠加约束：交付要经 WebDAV / 侧边栏预览」** |
 | `scripts/export_deck_pdf.mjs` | **HTML→PDF 导出（多文件架构）** · 每页独立 HTML 文件，playwright 逐个 `page.pdf()` → pdf-lib 合并。文字保留矢量可搜。依赖 `playwright pdf-lib` |
 | `scripts/export_deck_stage_pdf.mjs` | **HTML→PDF 导出（单文件 deck-stage 架构专用）** · 2026-04-20 新增。处理 shadow DOM slot 导致的「只出 1 页」、absolute 子元素溢出等坑。详见 `references/slide-decks.md` 末节。依赖 `playwright` |
 | `scripts/export_deck_pptx.mjs` | **HTML→可编辑 PPTX 导出** · 调 `html2pptx.js` 导出原生可编辑文本框，文字在 PPT 里双击可直接编辑。**HTML 必须符合 4 条硬约束**（见 `references/editable-pptx.md`），视觉自由度优先的场景请改走 PDF 路径。依赖 `playwright pptxgenjs sharp` |
@@ -443,7 +445,7 @@ disable-model-invocation: true
 | 反AI slop、内容规范、scale | `references/content-guidelines.md` |
 | 字体排印/字体配对/中文排印 | `references/typography.md` |
 | React+Babel项目setup | `references/react-setup.md` |
-| 做幻灯片 | `references/slide-decks.md` + `assets/deck_index.html`（默认多文件概览墙）+ `scripts/gen_deck_thumbs.mjs`（画廊缩略图）+ `assets/deck_stage.js`（仅 ≤5 页单文件） |
+| 做幻灯片 | `references/slide-decks.md` + `assets/deck_index.html`（默认多文件概览墙）+ `scripts/gen_deck_thumbs.mjs`（画廊缩略图）+ `assets/deck_stage.js`（仅 ≤5 页单文件）+ **`assets/deck_single_selfcontained.html`（要经 WebDAV/侧边栏预览时的自包含单文件）+ `scripts/merge_deck_single.py`（多文件→单文件合并）** |
 | 导出可编辑 PPTX（html2pptx 4 条硬约束） | `references/editable-pptx.md` + `scripts/html2pptx.js` |
 | 做动画/motion（**先读 pitfalls**）| `references/animation-pitfalls.md` + `references/animations.md` + `assets/animations.jsx` |
 | **动画的正向设计语法**（Anthropic 级叙事/运动/节奏/表达风格）| `references/animation-best-practices.md`（5 段叙事+Expo easing+运动语言 8 条+3 种场景配方）|

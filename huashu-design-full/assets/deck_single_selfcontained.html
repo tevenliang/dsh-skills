@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Deck · Self-contained Single File</title>
+<!--
+  deck_single_selfcontained.html — 自包含单文件 deck 模板（2026-09-01）
+  专为「交付要经 WebDAV / DSH 侧边栏 / 带认证预览环境」的场景设计。
+  所有页以 <section class="slide"> 内嵌本文件，零 iframe 外部依赖
+  → 预览不再触发 WebDAV basic auth 401（多文件 deck_index.html 会 forbidden）。
+
+  用法：直接把每页 <section class="slide"> 内容内嵌替换；可删/加任意多页；
+  样式集中在 :root 变量与各页布局段。已内建：
+    auto-scale 1920x1080 居中 · ←→/Space/Home/End 翻页 · 左右边缘点击翻页
+    右下页码计数 · localStorage 记忆播放位置 · 打印分页
+  键盘：← → / Space 翻页 · Home/End 首末 · P 打印
+-->
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --bg-1: #0a1929;
+    --bg-2: #1e3a5f;
+    --accent: #e94560;
+    --accent-2: #ff6b9d;
+    --ink: #ffffff;
+    --muted: rgba(255,255,255,0.72);
+    --faint: rgba(255,255,255,0.45);
+    --card: rgba(255,255,255,0.06);
+    --line: rgba(255,255,255,0.12);
+  }
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    font-family: -apple-system, "PingFang SC", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+    background: linear-gradient(135deg, var(--bg-1) 0%, var(--bg-2) 100%);
+    color: var(--ink);
+  }
+
+  /* ── 舞台与缩放 ── */
+  #stage { position: absolute; top: 0; left: 0; transform-origin: top left; background: transparent; }
+  .slide {
+    position: absolute; inset: 0; padding: 90px 110px;
+    display: flex; flex-direction: column;
+    opacity: 0; pointer-events: none;
+    transition: opacity .45s ease;
+    background:
+      radial-gradient(1200px 600px at 85% -10%, rgba(233,69,96,0.16), transparent 55%),
+      radial-gradient(900px 500px at -10% 110%, rgba(255,107,157,0.10), transparent 55%);
+  }
+  .slide.active { opacity: 1; pointer-events: auto; }
+
+  /* ── 通用排版 ── */
+  .kicker { font-size: 13px; letter-spacing: 0.28em; text-transform: uppercase; color: var(--accent-2); margin-bottom: 14px; font-weight: 600; }
+  h1 { font-size: 64px; line-height: 1.12; margin-bottom: 18px; font-weight: 800; letter-spacing: -0.01em; }
+  .lead { font-size: 24px; color: var(--muted); line-height: 1.55; max-width: 900px; }
+  .card-title { font-size: 26px; font-weight: 700; color: var(--accent); margin-bottom: 12px; }
+  .card-body { font-size: 18px; line-height: 1.7; color: var(--muted); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 34px 32px; backdrop-filter: blur(6px); }
+
+  /* ── 页码 / 角标 ── */
+  .test-badge {
+    position: absolute; top: 34px; right: 40px; z-index: 10;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    color: #fff; padding: 10px 22px; border-radius: 999px; font-size: 14px; font-weight: 700;
+    box-shadow: 0 6px 18px rgba(233,69,96,0.45); letter-spacing: 0.04em;
+  }
+  .pager {
+    position: absolute; bottom: 34px; right: 40px; z-index: 10;
+    font-variant-numeric: tabular-nums; font-size: 15px; color: var(--faint);
+    background: rgba(10,25,41,0.6); border: 1px solid var(--line);
+    padding: 8px 18px; border-radius: 999px; letter-spacing: 0.06em;
+  }
+  .pager b { color: var(--ink); }
+  .hint {
+    position: absolute; bottom: 34px; left: 40px; z-index: 10;
+    font-size: 13px; color: var(--faint); letter-spacing: 0.1em;
+  }
+  .nav-zone { position: absolute; top: 0; bottom: 0; width: 12%; cursor: pointer; z-index: 8; opacity: 0; transition: opacity .2s; }
+  .nav-zone.left { left: 0; } .nav-zone.right { right: 0; }
+  body:hover .nav-zone { opacity: 1; }
+  .nav-zone .arr { position: absolute; top: 50%; transform: translateY(-50%); width: 48px; height: 48px; border-radius: 999px; background: rgba(255,255,255,0.08); color: var(--muted); display: flex; align-items: center; justify-content: center; font-size: 26px; }
+  .nav-zone.left .arr { left: 18px; } .nav-zone.right .arr { right: 18px; }
+
+  /* ── 各页布局 ── */
+  /* 01 封面 */
+  .cover { justify-content: center; }
+  .cover .title { font-size: 92px; line-height: 1.06; font-weight: 900; letter-spacing: -0.015em; }
+  .cover .title em { font-style: normal; background: linear-gradient(135deg, #fff, var(--accent)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+  .cover .ensub { font-size: 30px; color: var(--muted); margin-top: 16px; }
+  .cover .tagline { margin-top: 40px; font-size: 19px; color: var(--accent-2); font-weight: 600; letter-spacing: 0.02em; }
+  .cover-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 22px; margin-top: 72px; }
+
+  /* 02 概览 */
+  .overview-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 22px; margin-bottom: 44px; }
+  .stat { background: rgba(233,69,96,0.10); border: 1px solid rgba(233,69,96,0.30); border-radius: 14px; padding: 30px 24px; text-align: center; }
+  .stat .num { font-size: 44px; font-weight: 800; color: var(--accent); line-height: 1; margin-bottom: 8px; font-variant-numeric: tabular-nums; }
+  .stat .lbl { font-size: 15px; color: var(--muted); }
+  .feat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; }
+
+  /* 03 功能 */
+  .func-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; margin-bottom: 40px; }
+  .func-icon { font-size: 40px; margin-bottom: 18px; display: block; }
+  .tech-box { background: rgba(233,69,96,0.10); border: 1px solid rgba(233,69,96,0.30); border-radius: 14px; padding: 34px 40px; }
+  .tech-box h3 { text-align: center; color: var(--accent); font-size: 22px; margin-bottom: 26px; letter-spacing: 0.04em; }
+  .tech-tags { display: flex; flex-wrap: wrap; justify-content: center; gap: 14px; }
+  .tag { border: 1px solid rgba(233,69,96,0.35); color: var(--accent-2); background: rgba(255,255,255,0.05); padding: 10px 20px; border-radius: 999px; font-size: 16px; font-weight: 500; }
+
+  /* 04 案例 */
+  .case-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; }
+  .case-card { position: relative; overflow: hidden; }
+  .case-card::before { content: ''; position: absolute; top: 0; left: 0; width: 4px; height: 100%; background: linear-gradient(to bottom, var(--accent), var(--accent-2)); }
+  .case-head { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
+  .case-icon { font-size: 34px; }
+  .case-card h3 { font-size: 24px; color: var(--accent); }
+  .case-card p { font-size: 17px; line-height: 1.7; color: var(--muted); }
+  .case-meta { display: flex; gap: 18px; margin-top: 18px; font-size: 14px; color: var(--faint); }
+
+  /* 05 联系 */
+  .contact-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+  .contact-card { text-align: center; padding: 40px 30px; }
+  .contact-icon { font-size: 42px; margin-bottom: 16px; display: block; }
+  .contact-card h3 { color: var(--accent); font-size: 24px; margin-bottom: 12px; }
+  .contact-card p { color: var(--muted); font-size: 17px; line-height: 1.7; }
+  .thanks { margin-top: 48px; text-align: center; font-size: 30px; color: var(--accent-2); font-weight: 700; animation: pulse 2.4s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .72; } }
+
+  @media print {
+    @page { size: 1920px 1080px; margin: 0; }
+    html, body { overflow: visible; height: auto; background: #fff; }
+    #stage { position: static; transform: none !important; }
+    .slide { position: relative; width: 1920px; height: 1080px; page-break-after: always; opacity: 1 !important; pointer-events: auto; }
+    .test-badge, .pager, .hint, .nav-zone { display: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="test-badge">🧪 测试演示</div>
+<div class="pager"><b id="cur">1</b> / <span id="tot">5</span></div>
+<div class="hint">← → 翻页 · P 打印</div>
+<div class="nav-zone left" id="navL"><div class="arr">‹</div></div>
+<div class="nav-zone right" id="navR"><div class="arr">›</div></div>
+
+<div id="stage">
+
+  <!-- 01 · 封面 -->
+  <section class="slide cover active">
+    <div class="kicker">Test Deck · Self-contained</div>
+    <h1 class="title">Test <em>Presentation</em></h1>
+    <div class="ensub">Huashu-Design Test Deck for Web GUI Preview</div>
+    <div class="tagline">Testing Web GUI Access and File Permissions</div>
+    <div class="cover-grid">
+      <div class="card"><div class="card-title">项目目的</div><div class="card-body">验证 Web GUI 文件预览功能,测试文件权限修复与访问链路。</div></div>
+      <div class="card"><div class="card-title">技术架构</div><div class="card-body">自包含单文件 HTML,零外部依赖,天然适配 WebDAV 预览。</div></div>
+      <div class="card"><div class="card-title">功能特性</div><div class="card-body">键盘翻页、点击导航、自动缩放、打印优化。</div></div>
+      <div class="card"><div class="card-title">测试状态</div><div class="card-body">✅ 权限已修复<br>✅ WebDAV 正常<br>✅ 预览可用</div></div>
+    </div>
+  </section>
+
+  <!-- 02 · 概览 -->
+  <section class="slide">
+    <div class="kicker">02 · Overview</div>
+    <h1>演示概览</h1>
+    <div class="lead">测试幻灯片演示系统的功能与性能表现,验证各模块在预览环境下的可用性。</div>
+    <div class="overview-stats">
+      <div class="stat"><div class="num">5</div><div class="lbl">总幻灯片数</div></div>
+      <div class="stat"><div class="num">16:9</div><div class="lbl">标准宽高比</div></div>
+      <div class="stat"><div class="num">100%</div><div class="lbl">兼容性</div></div>
+      <div class="stat"><div class="num">24/7</div><div class="lbl">可用性</div></div>
+    </div>
+    <div class="feat-grid">
+      <div class="card"><div class="card-title">设计风格</div><div class="card-body">企业级 UI,深色主题,克制的渐变与强调色,专业的视觉节奏。</div></div>
+      <div class="card"><div class="card-title">响应式布局</div><div class="card-body">桌面 / 平板 / 移动端自适应,任何尺寸下排版稳定。</div></div>
+      <div class="card"><div class="card-title">交互设计</div><div class="card-body">键盘导航、点击翻页、手势操作,流畅一致。</div></div>
+    </div>
+  </section>
+
+  <!-- 03 · 功能 -->
+  <section class="slide">
+    <div class="kicker">03 · Features</div>
+    <h1>核心功能特性</h1>
+    <div class="lead">测试演示系统的核心能力与技术优势。</div>
+    <div class="func-grid">
+      <div class="card"><span class="func-icon">▦</span><div class="card-title">精准定位</div><div class="card-body">智能匹配需求,提供个性化的测试体验与结果分析。</div></div>
+      <div class="card"><span class="func-icon">⚡</span><div class="card-title">极速响应</div><div class="card-body">毫秒级响应,高并发架构保障大规模访问稳定。</div></div>
+      <div class="card"><span class="func-icon">🔒</span><div class="card-title">安全可靠</div><div class="card-body">多层防护,数据加密传输,隐私符合标准。</div></div>
+      <div class="card"><span class="func-icon">📊</span><div class="card-title">数据洞察</div><div class="card-body">实时分析与可视化,多维度报表辅助决策。</div></div>
+      <div class="card"><span class="func-icon">🔄</span><div class="card-title">持续迭代</div><div class="card-body">敏捷开发,快速响应变化,持续交付高质量更新。</div></div>
+      <div class="card"><span class="func-icon">🌐</span><div class="card-title">跨平台</div><div class="card-body">Web / 移动 / 桌面统一体验,无缝切换。</div></div>
+    </div>
+    <div class="tech-box">
+      <h3>技术栈</h3>
+      <div class="tech-tags">
+        <span class="tag">HTML5</span><span class="tag">CSS3</span><span class="tag">JavaScript</span>
+        <span class="tag">WebDAV</span><span class="tag">自包含单文件</span><span class="tag">可访问性</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 04 · 案例 -->
+  <section class="slide">
+    <div class="kicker">04 · Use Cases</div>
+    <h1>实际应用案例</h1>
+    <div class="lead">测试演示系统在各行业的成功应用场景。</div>
+    <div class="case-grid">
+      <div class="card case-card">
+        <div class="case-head"><span class="case-icon">🏢</span><h3>企业内部测试</h3></div>
+        <p>大型企业使用本系统进行演示文稿测试,验证文件权限、WebDAV 访问、侧边栏预览等核心链路。</p>
+        <div class="case-meta"><span>✅ 权限验证</span><span>✅ 访问测试</span><span>✅ 预览确认</span></div>
+      </div>
+      <div class="card case-card">
+        <div class="case-head"><span class="case-icon">🎨</span><h3>设计团队协作</h3></div>
+        <p>设计团队利用自包含 Deck 架构进行方案评审、原型演示与版本对比,提升协作效率。</p>
+        <div class="case-meta"><span>✅ 版本管理</span><span>✅ 设计评审</span><span>✅ 原型演示</span></div>
+      </div>
+      <div class="card case-card">
+        <div class="case-head"><span class="case-icon">📊</span><h3>数据展示报告</h3></div>
+        <p>数据分析团队使用单文件概览快速浏览图表,支持实时交互与钻取分析。</p>
+        <div class="case-meta"><span>✅ 网格浏览</span><span>✅ 画廊模式</span><span>✅ 实时交互</span></div>
+      </div>
+      <div class="card case-card">
+        <div class="case-head"><span class="case-icon">🚀</span><h3>产品发布演示</h3></div>
+        <p>产品发布使用演示模式,支持全屏展示、键盘控制、打印输出等专业功能。</p>
+        <div class="case-meta"><span>✅ 全屏演示</span><span>✅ 键盘控制</span><span>✅ 打印输出</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 05 · 联系 -->
+  <section class="slide">
+    <div class="kicker">05 · Contact</div>
+    <h1>联系我们</h1>
+    <div class="lead">感谢您的测试与关注,期待您的反馈与建议。</div>
+    <div class="contact-grid">
+      <div class="card contact-card"><span class="contact-icon">✉</span><h3>邮箱联系</h3><p>test-support@huashu-design.example.com<br>技术支持与问题反馈</p></div>
+      <div class="card contact-card"><span class="contact-icon">◉</span><h3>在线沟通</h3><p>工作日 9:00-18:00<br>实时在线客服支持</p></div>
+      <div class="card contact-card"><span class="contact-icon">▤</span><h3>文档中心</h3><p>完整技术文档与使用指南<br>最佳实践与常见问题</p></div>
+    </div>
+    <div class="thanks">谢谢使用 Test Deck</div>
+  </section>
+
+</div>
+
+<script>
+(function () {
+  var slides = Array.prototype.slice.call(document.querySelectorAll('.slide'));
+  var total = slides.length;
+  var cur = 0;
+  var stage = document.getElementById('stage');
+  var curEl = document.getElementById('cur');
+  var totEl = document.getElementById('tot');
+  totEl.textContent = total;
+
+  function fit() {
+    var s = Math.min(innerWidth / 1920, innerHeight / 1080);
+    stage.style.width = 1920 + 'px';
+    stage.style.height = 1080 + 'px';
+    stage.style.transform = 'scale(' + s + ') translate(' + ((innerWidth - 1920 * s) / 2 / s) + 'px,' + ((innerHeight - 1080 * s) / 2 / s) + 'px)';
+  }
+  function show(i) {
+    if (i < 0 || i >= total) return;
+    slides[cur].classList.remove('active');
+    cur = i;
+    slides[cur].classList.add('active');
+    curEl.textContent = (cur + 1);
+    try { localStorage.setItem('test-deck-pos', String(cur)); } catch (_) {}
+  }
+  function next() { show(Math.min(cur + 1, total - 1)); }
+  function prev() { show(Math.max(cur - 1, 0)); }
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') { e.preventDefault(); next(); }
+    else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); prev(); }
+    else if (e.key === 'Home') { e.preventDefault(); show(0); }
+    else if (e.key === 'End') { e.preventDefault(); show(total - 1); }
+  });
+  document.getElementById('navL').addEventListener('click', prev);
+  document.getElementById('navR').addEventListener('click', next);
+  window.addEventListener('resize', fit);
+
+  try { var v = parseInt(localStorage.getItem('test-deck-pos'), 10); if (!isNaN(v) && v >= 0 && v < total) cur = v; } catch (_) {}
+  fit();
+  slides.forEach(function (sl, i) { sl.classList.toggle('active', i === cur); });
+  curEl.textContent = (cur + 1);
+})();
+</script>
+</body>
+</html>
