@@ -43,6 +43,15 @@ summarization:
 vm:
   proxy: http://127.0.0.1:7890
 
+# 图片存储 (XHS 图文笔记用, 其他平台暂未启用)
+# 通过 picgo CLI → 腾讯云 COS, 拿到 URL 后 MD 写 ![](url)
+# 失败兜底: fall_back_local → 图片留 vault/media/xhs/, MD 用 wikilink
+image_storage:
+  enabled: true                 # true=PicGo/COS; false=留本地 (旧行为)
+  provider: picgo               # 当前仅 picgo
+  on_failure: fall_back_local   # fall_back_local | fail
+  temp_dir: /tmp/crawl-images   # 临时目录 (上传成功即删)
+
 # 爬虫配置
 crawler:
   # 同一 IP 请求间隔（秒），防止被风控
