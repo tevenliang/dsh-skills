@@ -1,0 +1,9 @@
+{
+  "groq": {
+    "status": "active"
+  },
+  "opencli": {
+    "status": "deprecated"
+  },
+  "last_recovery": "2026-08-31T20:30:39+08:00"
+}
