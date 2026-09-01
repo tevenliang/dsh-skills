@@ -13,6 +13,8 @@ platforms:
     cookie_file: /home/ubuntu/.agents/credentials/ominicrawl/douyin.txt
     # Cookie 从 config.yaml 的 TokenManager 段读取
     cookie_config: /home/ubuntu/.dsh/skills/crawl/ingest-douyin/douyin_api/crawlers/douyin/web/config.yaml
+    # 只爬最近 N 天发布的视频 (对齐 Mac 版 7 天窗口); 0 = 不过滤(补历史用)
+    recent_days: 7
   bilibili:
     enabled: true
     cookie_file: /home/ubuntu/.agents/credentials/ominicrawl/bilibili.txt

@@ -75,42 +75,100 @@ class DouyinCrawler:
         
         return aweme_detail
     
-    async def get_user_videos(self, sec_user_id: str = "", max_cursor: str = "0", count: int = 10) -> List[Dict]:
-        """获取用户视频列表
-        
+    async def get_user_videos(self, sec_user_id: str = "", max_cursor: str = "0", count: int = 30,
+                                  recent_days: int = 7, max_retry: int = 3) -> List[Dict]:
+        """获取用户视频列表 (对齐 Mac 版 crawl common-flow/crawl.py _list_douyin_videos)
+
         Args:
-            sec_user_id: 用户 sec_uid（空则使用 cookie 中的用户）
+            sec_user_id: 用户 sec_uid
             max_cursor: 分页游标
-            count: 每页数量
-            
+            count: 每页数量 (默认 30 — Mac 版 fetch_count=max(30, limit+10))
+            recent_days: 只保留最近 N 天的视频; 0 = 不过滤 (补历史用)
+            max_retry: 限流退避重试次数 (Mac 版 _backoff=(20,40,80) ×3)
+
         Returns:
-            视频列表
+            视频列表 — 不排序 (抖音接口本身按 create_time 倒序返回, 实测验证),
+            已排除置顶 (is_top)。限流(403/aweme_list=None)时退避重试。
         """
-        url = "https://www.douyin.com/aweme/v1/web/aweme/post/"
-        params = {
-            "sec_user_id": sec_user_id,
-            "max_cursor": max_cursor,
-            "count": count,
-            "device_platform": "webapp",
-            "aid": "6383",
-            "channel": "channel_pc_web",
-            "pc_client_type": "1",
-            "version_code": "170400",
-            "version_name": "17.4.0",
-        }
-        
-        signed_url = self._sign_url(url, params)
-        
-        async with httpx.AsyncClient(proxy=self.proxy, timeout=15, follow_redirects=True) as client:
-            resp = await client.get(signed_url, headers=self.headers)
-            data = resp.json()
-        
-        if data.get("status_code") != 0:
-            print(f"    [douyin] get_user_videos failed: {data.get('status_code')}")
+        # Mac 版 2026-08-13 fix: 抖音反爬限流 (403 / aweme_list=None) 会静默漏掉新视频。
+        # 限流是短时窗口, 退避后重试通常能拿回新鲜列表。
+        _backoff = (20, 40, 80)
+        _last_err = ""
+        aweme_list = None
+        for _att in range(1, max_retry + 1):
+            try:
+                url = "https://www.douyin.com/aweme/v1/web/aweme/post/"
+                params = {
+                    "sec_user_id": sec_user_id,
+                    "max_cursor": max_cursor,
+                    "count": count,
+                    "device_platform": "webapp",
+                    "aid": "6383",
+                    "channel": "channel_pc_web",
+                    "pc_client_type": "1",
+                    "version_code": "170400",
+                    "version_name": "17.4.0",
+                }
+                signed_url = self._sign_url(url, params)
+
+                # Mac 版 2026-08-22: wait_for(30s) 防 SSL 握手永久挂死
+                async with httpx.AsyncClient(proxy=self.proxy, timeout=15, follow_redirects=True) as client:
+                    resp = await asyncio.wait_for(
+                        client.get(signed_url, headers=self.headers), timeout=30)
+                    data = resp.json()
+            except asyncio.TimeoutError:
+                _last_err = "请求超时(30s)"
+                if _att < max_retry:
+                    print(f"    [douyin] 请求超时(30s, 第{_att}次), {_backoff[_att-1]}s 后重试…")
+                    await asyncio.sleep(_backoff[_att-1])
+                    continue
+                print(f"    [douyin] 请求超时(30s) 重试耗尽: {_last_err}")
+                return []
+            except Exception as e:
+                _last_err = f"库直连异常: {type(e).__name__}: {str(e)[:100]}"
+                if "403" in _last_err or "Forbidden" in _last_err:
+                    print(f"    [douyin] 403/风控({_att}次), 跳过")
+                    return []
+                if _att < max_retry:
+                    print(f"    [douyin] 限流/异常(第{_att}次), {_backoff[_att-1]}s 后重试…")
+                    await asyncio.sleep(_backoff[_att-1])
+                    continue
+                print(f"    [douyin] 重试耗尽: {_last_err}")
+                return []
+
+            if not isinstance(data, dict):
+                print(f"    [douyin] 非 dict 响应(第{_att}次), 跳过")
+                return []
+            if data.get("status_code") != 0:
+                print(f"    [douyin] get_user_videos failed: {data.get('status_code')}")
+                return []
+            aweme_list = data.get("aweme_list")
+            # status_code=0 + aweme_list=None 是典型限流签名 → 退避重试
+            if aweme_list is None:
+                _sc = data.get("status_code")
+                _last_err = f"aweme_list=None, status_code={_sc}(风控/Cookie过期/限流)"
+                if _att < max_retry:
+                    print(f"    [douyin] 限流(status_code={_sc}, 第{_att}次), {_backoff[_att-1]}s 后重试…")
+                    await asyncio.sleep(_backoff[_att-1])
+                    continue
+                print(f"    [douyin] 失败: {_last_err}")
+                return []
+            break  # 成功拿到列表
+
+        if aweme_list is None:
+            print(f"    [douyin] 未知限流: {_last_err}")
             return []
-        
-        aweme_list = data.get("aweme_list") or []
-        return aweme_list
+
+        # 对齐 Mac 版: 排除置顶 (is_top) + 7 天窗口过滤
+        normal = [v for v in aweme_list if not v.get("is_top")]
+        if recent_days > 0:
+            import time as _t
+            _cutoff = int(_t.time()) - recent_days * 86400
+            filtered = [v for v in normal if v.get("create_time", 0) >= _cutoff]
+            if len(filtered) != len(normal):
+                print(f"    [douyin] {recent_days}天窗口过滤: 跳过 {len(normal) - len(filtered)} 条历史视频")
+            return filtered
+        return normal
     
     def get_audio_url(self, aweme_detail: Dict) -> Optional[str]:
         """从视频详情获取音频 URL

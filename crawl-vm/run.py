@@ -640,7 +640,7 @@ async def _download_url_to_file(url: str, dest: Path, user_agent: str, referer: 
 async def run_platform(platform: str, config: dict, publisher: VaultPublisher,
                        transcribe: TranscriptionService, summarize: SummarizationService,
                        logger: EventLogger, video_ids: list = None, author_ids: list = None,
-                       note_cards: list = None):
+                       note_cards: list = None, douyin_recent_days: int = None):
     """运行单个平台"""
     
     print(f"\n{'='*50}")
@@ -669,9 +669,12 @@ async def run_platform(platform: str, config: dict, publisher: VaultPublisher,
         
         elif author_ids:
             # 从博主获取视频列表
+            if douyin_recent_days is None:
+                douyin_recent_days = config.get("platforms", {}).get("douyin", {}).get("recent_days", 7)
+            print(f"  [douyin] recent_days={douyin_recent_days} (0=全部历史)")
             for author_id in author_ids:
                 print(f"\nFetching videos for author: {author_id}")
-                videos = await crawler.get_user_videos(sec_user_id=author_id)
+                videos = await crawler.get_user_videos(sec_user_id=author_id, recent_days=douyin_recent_days)
                 if videos is None:
                     print(f"  Failed to fetch videos, skipping")
                     continue
@@ -782,6 +785,8 @@ async def main():
     parser.add_argument('--bilibili-authors', nargs='*', help='指定 B站博主 mid')
     parser.add_argument('--xiaohongshu-authors', nargs='*', help='指定小红书博主 user_id')
     parser.add_argument('--xiaohongshu-ids', nargs='*', help='指定小红书 note_id (手动喂详情)')
+    parser.add_argument('--douyin-recent-days', type=int, default=None,
+                        help='抖音只爬最近 N 天视频 (0=不过滤补历史); 默认读 config.yaml platforms.douyin.recent_days')
     
     args = parser.parse_args()
     
@@ -861,7 +866,8 @@ async def main():
         
         await run_platform(
             platform, config, publisher, transcribe, summarize, logger,
-            video_ids=video_ids, author_ids=author_ids
+            video_ids=video_ids, author_ids=author_ids,
+            douyin_recent_days=args.douyin_recent_days
         )
     
     # 生成每日 index
