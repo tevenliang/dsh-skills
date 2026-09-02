@@ -88,7 +88,8 @@ class XiaohongshuCrawler:
         """
         uri = "/api/sns/web/v1/user_posted"
         params = {"num": num, "cursor": "", "user_id": user_id, "image_scenes": "FD_WM_WEBP"}
-        h = self.xs_client.sign_headers_get(uri=uri, cookies=self._parse_cookies(), params=params)
+        # 2026-09-02 修复: XHS 自 2026-03 起对数据接口强制 xyw 格式, 默认 xys 会 406 / -100 登录过期
+        h = self.xs_client.sign_headers_get(uri=uri, cookies=self._parse_cookies(), params=params, sign_format="xyw")
         h.update(self.headers_base)
 
         async with AsyncSession(proxy=self.proxy, impersonate="chrome131") as s:
@@ -110,7 +111,7 @@ class XiaohongshuCrawler:
         """
         uri = "/api/sns/web/v1/homefeed"
         payload = {"cursor_score": "", "num": num, "refresh_type": 1, "note_index": 0}
-        h = self.xs_client.sign_headers_post(uri=uri, cookies=self._parse_cookies(), payload=payload)
+        h = self.xs_client.sign_headers_post(uri=uri, cookies=self._parse_cookies(), payload=payload, sign_format="xyw")
         h.update(self.headers_base)
 
         async with AsyncSession(proxy=self.proxy, impersonate="chrome131") as s:
@@ -137,7 +138,11 @@ class XiaohongshuCrawler:
             "image_scenes": ["FD_WM_WEBP"],
             "xsec_token": xsec_token,
         }
-        h = self.xs_client.sign_headers_post(uri=uri, cookies=self._parse_cookies(), payload=payload)
+        # feed 接口需要 x-rap-param header (xhshow 自动生成)
+        h = self.xs_client.sign_headers_post(
+            uri=uri, cookies=self._parse_cookies(), payload=payload,
+            sign_format="xyw", x_rap=True,
+        )
         # Referer 必须带 xsec_token, 否则 406
         h["Referer"] = self._referer_for(note_id, xsec_token)
         # 保留其他 base headers (覆盖 Referer 以外的)
@@ -163,7 +168,10 @@ class XiaohongshuCrawler:
         uri = "/api/sns/web/v1/search/notes"
         payload = {"keyword": keyword, "page": page, "page_size": page_size,
                    "sort": "general", "search_id": ""}
-        h = self.xs_client.sign_headers_post(uri=uri, cookies=self._parse_cookies(), payload=payload)
+        h = self.xs_client.sign_headers_post(
+            uri=uri, cookies=self._parse_cookies(), payload=payload,
+            sign_format="xyw", x_rap=True,
+        )
         h.update(self.headers_base)
 
         async with AsyncSession(proxy=self.proxy, impersonate="chrome131") as s:
