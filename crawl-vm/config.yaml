@@ -22,15 +22,14 @@ platforms:
     enabled: true
     cookie_file: /home/ubuntu/.agents/credentials/ominicrawl/xiaohongshu.txt
 
-# 转录配置 (freellmapi 主路径 + Groq fallback)
-# 主路径走 freellmapi localhost:31415 (它内部 router 自动选 groq/cloudflare whisper)
-# Fallback 直连 Groq (需 VPN), 仅当 freellmapi 不可达时启用
+# 转录配置 (Groq 主路径 + 阿里云百炼 bailian 兜底)
+# 主路径直连 Groq whisper (需 VPN 127.0.0.1:7890)
+# Fallback 走 bailian bl speech recognize (fun-asr, 中文长录音 ASR, 无需 VPN)
 transcription:
-  model: whisper-1     # freellmapi 推荐 "whisper-1" 或 "auto" (让 router 决定)
-  proxy: http://127.0.0.1:7890  # Groq fallback 用的 VPN 代理
+  model: whisper-large-v3  # Groq 主路径: whisper-large-v3 / whisper-large-v3-turbo
+  proxy: http://127.0.0.1:7890  # Groq 需要的 VPN 代理
   language: zh
-  freellmapi_timeout: 120  # freellmapi 转录超时 (秒)
-  fallback_to_groq: true   # freellmapi 挂了是否回退到 Groq 直连
+  groq_timeout: 180  # Groq 转录超时 (秒)
 
 # 总结配置 (Groq LLM)
 summarization:

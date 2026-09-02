@@ -8,7 +8,7 @@
   },
   "call": {
     "kind": "shell",
-    "template": "cd /Users/tianwenliang/.agents/skills/Search/wechat-article-search && node scripts/search_wechat.js '<QUERY>' --num 10 --resolve-url",
+    "template": "node {skill_dir}/scripts/search_wechat.js '<QUERY>' --num 10 --resolve-url",
     "params": {
       "QUERY": "string (required)"
     }

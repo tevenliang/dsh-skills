@@ -8,7 +8,7 @@
   },
   "call": {
     "kind": "shell",
-    "template": "python3 /Users/tianwenliang/.agents/skills/CLI/xhs-cli/scripts/xhs_search.py search '<QUERY>' --limit 10 --render",
+    "template": "python3 {skill_dir}/scripts/xhs_search.py search '<QUERY>' --limit 10 --render",
     "params": {
       "QUERY": "string (required)"
     }

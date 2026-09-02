@@ -43,7 +43,7 @@ class BusinessSearch:
         # 跨平台解析元宝搜索脚本路径（不再写死 Windows 路径）
         home = os.path.expanduser("~")
         candidates = [
-            os.path.join(home, ".agents/skills/Search/tencent-yuanbao-search/scripts/websearch.py"),
+            os.path.join(home, ".dsh/skills/tencent-yuanbao-search/scripts/websearch.py"),
             os.path.join(home, ".workbuddy/skills/Search/tencent-yuanbao-search/scripts/websearch.py"),
         ]
         self.search_script = next((p for p in candidates if os.path.exists(p)), candidates[0])

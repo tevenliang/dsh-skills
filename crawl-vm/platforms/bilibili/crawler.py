@@ -81,14 +81,29 @@ class BilibiliCrawler:
             return resp.json()
     
     async def ensure_mixin_key(self):
-        """确保 mixin_key 可用"""
+        """确保 mixin_key 可用 (带退避重试, 防网络瞬断崩 pipeline)
+
+        2026-09-02 fix: 之前 fetch_mixin_key 的 httpx.ConnectError 未捕获,
+        网络瞬断直接抛到顶层导致整个 pipeline 退出 (退出码 1)。
+        """
         try:
             mixin_key = self._get_cached_mixin_key()
             if mixin_key:
                 return
         except RuntimeError:
             pass
-        await self._fetch_mixin_key()
+        # 网络瞬断重试 (2s, 4s)
+        last_err = None
+        for attempt in range(1, 4):
+            try:
+                await self._fetch_mixin_key()
+                return
+            except Exception as e:
+                last_err = e
+                print(f"    [bili] wbi mixin_key 拉取失败(第{attempt}次): {type(e).__name__}: {str(e)[:80]}")
+                if attempt < 3:
+                    await asyncio.sleep(2 * attempt)
+        raise last_err if last_err else RuntimeError("mixin_key 获取失败")
     
     async def fetch_video_detail(self, bvid: str) -> Optional[Dict]:
         """获取视频详情

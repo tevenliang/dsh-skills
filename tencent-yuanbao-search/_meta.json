@@ -1,0 +1,16 @@
+{
+  "name": "tencent-yuanbao-search",
+  "description": "腾讯元宝搜索 - 国内实时搜索",
+  "search": true,
+  "requires": {
+    "bins": ["python3"],
+    "env": []
+  },
+  "call": {
+    "kind": "shell",
+    "template": "python3 {skill_dir}/scripts/websearch.py --query '<QUERY>' --mode 0",
+    "params": {
+      "query": "string (required)"
+    }
+  }
+}

@@ -3,46 +3,43 @@
 """
 common/transcribe.py — 音频转录模块
 
-主路径: freellmapi (localhost:31415) - 多 provider auto-router (groq whisper / cloudflare whisper / etc.)
-Fallback: 直连 Groq (需要 VPN) - 仅当 freellmapi 不可达时启用
+主路径: 直连 Groq (whisper-large-v3, 需 VPN 7890)
+Fallback: 阿里云百炼 bailian (bl speech recognize, fun-asr 中文长录音 ASR)
 
-为什么优先 freellmapi:
-1. 自动 provider failover: Groq 额度耗尽自动切 Cloudflare Workers AI whisper
-2. 多 key 轮询: 不必担心单 key 429
-3. 不需要 VPN: freellmapi 本身已配 PROXY_URL=http://127.0.0.1:7890 调境外 API
+Google Drive 文件下载 (gdown 依赖) 等不在本模块职责内。
 """
 import json
 import subprocess
-import urllib.request
-import urllib.error
-import urllib.parse
-import mimetypes
+import time as _time
 from pathlib import Path
 from typing import Optional
+
+# ── record_timing bridge ─────────────────────────────────────────────────────
+# 从 supervisor state 借 record_timing（VM 的 supervisor 运行在同一进程树，路径可达）
+_SKILL_DIR = Path(__file__).resolve().parent.parent
+_STATE_PY = _SKILL_DIR / "common_supervisor" / "state.py"
+if _STATE_PY.exists():
+    import sys
+    _sup_dir = str(_SKILL_DIR / "common_supervisor")
+    if _sup_dir not in sys.path:
+        sys.path.insert(0, _sup_dir)
+    try:
+        from state import record_timing
+    except Exception:
+        record_timing = None
+else:
+    record_timing = None
 
 
 class TranscriptionService:
     def __init__(self, config: dict):
         # 配置参数
-        self.model = config.get("model", "whisper-1")          # freellmapi 推荐 "whisper-1" / "auto"
-        self.proxy = config.get("proxy", "http://127.0.0.1:7890")  # freellmapi 不可达时 fallback 用
+        self.model = config.get("model", "whisper-large-v3")   # Groq 主路径模型
+        self.proxy = config.get("proxy", "http://127.0.0.1:7890")  # Groq 需要的 VPN 代理
         self.language = config.get("language", "zh")
-        self.freellmapi_timeout = config.get("freellmapi_timeout", 120)
-        self.fallback_to_groq = config.get("fallback_to_groq", True)
+        self.groq_timeout = config.get("groq_timeout", 180)
 
-        # 读 freellmapi cookie (key + base_url)
-        self.freellmapi_key = None
-        self.freellmapi_base = "http://127.0.0.1:31415/v1"
-        key_file = Path.home() / ".agents/credentials/ominicrawl/freellmapi.json"
-        if key_file.exists():
-            try:
-                data = json.loads(key_file.read_text())
-                self.freellmapi_key = data.get("api_key")
-                self.freellmapi_base = data.get("base_url", self.freellmapi_base)
-            except (json.JSONDecodeError, KeyError) as e:
-                print(f"    [transcribe] Failed to read freellmapi key: {e}")
-
-        # 读 Groq cookie (fallback)
+        # 读 Groq cookie (主路径)
         self.groq_key = None
         groq_file = Path.home() / ".agents/credentials/ominicrawl/groq.json"
         if groq_file.exists():
@@ -53,103 +50,41 @@ class TranscriptionService:
                 print(f"    [transcribe] Failed to read groq key: {e}")
 
     def transcribe(self, audio_path: Path) -> str:
-        """转录音频文件 (主路径 freellmapi, fallback Groq)"""
+        """转录音频文件 (主路径 Groq, fallback bailian)"""
         if not audio_path.exists() or audio_path.stat().st_size < 1000:
             return ""
 
-        # 主路径: freellmapi (优先)
-        if self.freellmapi_key:
-            text = self._freellmapi_transcribe(audio_path)
-            if text:
-                return text
-            print(f"    [transcribe] freellmapi failed, trying Groq fallback...")
-
-        # Fallback: Groq 直连
-        if self.fallback_to_groq and self.groq_key:
+        # 主路径: Groq 直连
+        if self.groq_key:
             text = self._groq_transcribe(audio_path)
             if text:
                 return text
+            print(f"    [transcribe] Groq failed, trying bailian fallback...")
+
+        # Fallback: 阿里云百炼 (bl speech recognize, fun-asr)
+        text = self._bailian_transcribe(audio_path)
+        if text:
+            return text
 
         print(f"    [transcribe] All providers failed")
         return ""
 
-    def _freellmapi_transcribe(self, audio_path: Path) -> str:
-        """通过 freellmapi localhost:31415 转录
-
-        freellmapi 内部 router 自动选 provider (groq whisper / cloudflare whisper)
-        - POST /v1/audio/transcriptions with model=auto
-        - 返回 {"text": "..."}
-        """
-        url = f"{self.freellmapi_base}/audio/transcriptions"
-        # freellmapi router 推荐 "auto", "whisper-1" 在某些 routing 状态下会 502 (router 内部错误)
-        model = "auto"
-
-        try:
-            # 用 Python urllib (避免 curl subprocess 依赖)
-            boundary = "----FormBoundary" + str(hash(audio_path) & 0xFFFF)
-            with open(audio_path, 'rb') as f:
-                audio_data = f.read()
-
-            body = (
-                f"--{boundary}\r\n"
-                f'Content-Disposition: form-data; name="file"; filename="{audio_path.name}"\r\n'
-                f"Content-Type: {mimetypes.guess_type(str(audio_path))[0] or 'audio/wav'}\r\n\r\n"
-            ).encode() + audio_data + (
-                f"\r\n--{boundary}\r\n"
-                f'Content-Disposition: form-data; name="model"\r\n\r\n{model}\r\n'
-                f"--{boundary}\r\n"
-                f'Content-Disposition: form-data; name="language"\r\n\r\n{self.language}\r\n'
-                f"--{boundary}--\r\n"
-            ).encode()
-
-            req = urllib.request.Request(
-                url,
-                data=body,
-                headers={
-                    "Authorization": f"Bearer {self.freellmapi_key}",
-                    "Content-Type": f"multipart/form-data; boundary={boundary}",
-                    "Content-Length": str(len(body)),
-                },
-                method="POST",
-            )
-            with urllib.request.urlopen(req, timeout=self.freellmapi_timeout) as resp:
-                data = json.loads(resp.read())
-                if "text" in data and data["text"]:
-                    print(f"    [transcribe] freellmapi success: {len(data['text'])} chars (model={model})")
-                    return data["text"]
-                elif "error" in data:
-                    print(f"    [transcribe] freellmapi error: {data['error'].get('message', '?')[:100]}")
-                    return ""
-                print(f"    [transcribe] freellmapi empty response")
-                return ""
-        except urllib.error.URLError as e:
-            print(f"    [transcribe] freellmapi connection error: {str(e)[:100]}")
-            return ""
-        except (json.JSONDecodeError, KeyError) as e:
-            print(f"    [transcribe] freellmapi parse error: {e}")
-            return ""
-        except Exception as e:
-            print(f"    [transcribe] freellmapi error: {str(e)[:100]}")
-            return ""
-
     def _groq_transcribe(self, audio_path: Path) -> str:
-        """直连 Groq whisper (需 VPN) - freellmapi 不可达时的 fallback
+        """直连 Groq whisper (需 VPN 127.0.0.1:7890)
 
         Groq 接受的具体 model 名: whisper-large-v3, whisper-large-v3-turbo,
-        distil-whisper-large-v3-en 等 (不能用 "auto" 或 "whisper-1", 这些是 freellmapi 抽象名)
+        distil-whisper-large-v3-en 等。
         """
         if not self.groq_key:
             return ""
 
-        # 如果 config 里 model 是 freellmapi 抽象名, fallback 时换成 Groq 自己的 model
         groq_model = self.model
         if groq_model in ("auto", "whisper-1"):
-            groq_model = "whisper-large-v3"  # Groq fallback 默认
+            groq_model = "whisper-large-v3"
 
         # Groq API 支持 prompt 参数引导 Whisper 添加标点
         prompt = "Chinese, formal, with proper punctuation. 请用中文标点符号。"
 
-        # 调用 Groq API
         cmd = [
             "curl", "-s", "--proxy", self.proxy,
             "-X", "POST",
@@ -162,21 +97,78 @@ class TranscriptionService:
             "-F", "response_format=text",
         ]
 
+        t0 = _time.time()
         try:
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=self.groq_timeout)
+            elapsed = _time.time() - t0
             if result.returncode == 0 and result.stdout.strip():
                 text = result.stdout.strip()
-                print(f"    [transcribe] Groq fallback success: {len(text)} chars")
+                print(f"    [transcribe] Groq success: {len(text)} chars ({elapsed:.1f}s)")
+                if record_timing:
+                    record_timing("transcribe_groq", elapsed, {"chars": len(text), "ok": True})
                 return text
             else:
                 err = result.stderr[:100] if result.stderr else f"code={result.returncode}"
-                print(f"    [transcribe] Groq fallback failed: {err}")
+                if result.stdout:
+                    err = result.stdout[:200]
+                print(f"    [transcribe] Groq failed: {err} ({elapsed:.1f}s)")
+                if record_timing:
+                    record_timing("transcribe_groq", elapsed, {"ok": False, "err": str(err)[:80]})
                 return ""
         except subprocess.TimeoutExpired:
-            print(f"    [transcribe] Groq fallback timeout")
+            elapsed = _time.time() - t0
+            print(f"    [transcribe] Groq timeout ({elapsed:.1f}s)")
+            if record_timing:
+                record_timing("transcribe_groq", elapsed, {"ok": False, "err": "timeout"})
             return ""
         except Exception as e:
-            print(f"    [transcribe] Groq fallback error: {e}")
+            elapsed = _time.time() - t0
+            print(f"    [transcribe] Groq error: {e} ({elapsed:.1f}s)")
+            if record_timing:
+                record_timing("transcribe_groq", elapsed, {"ok": False, "err": str(e)[:80]})
+            return ""
+
+    def _bailian_transcribe(self, audio_path: Path) -> str:
+        """阿里云百炼 ASR 兜底 (bl speech recognize, fun-asr)
+
+        使用已安装的 bailian CLI (bl), 默认模型 fun-asr 支持中文长录音。
+        """
+        cmd = [
+            "bl", "speech", "recognize",
+            "--url", str(audio_path),
+            "--language", self.language,
+            "--output", "text",
+        ]
+
+        t0 = _time.time()
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+            elapsed = _time.time() - t0
+            if result.returncode == 0 and result.stdout.strip():
+                text = result.stdout.strip()
+                print(f"    [transcribe] bailian success: {len(text)} chars ({elapsed:.1f}s)")
+                if record_timing:
+                    record_timing("transcribe_bailian", elapsed, {"chars": len(text), "ok": True})
+                return text
+            else:
+                err = result.stderr[:200] if result.stderr else f"code={result.returncode}"
+                if result.stdout:
+                    err = result.stdout[:200]
+                print(f"    [transcribe] bailian failed: {err} ({elapsed:.1f}s)")
+                if record_timing:
+                    record_timing("transcribe_bailian", elapsed, {"ok": False, "err": str(err)[:80]})
+                return ""
+        except subprocess.TimeoutExpired:
+            elapsed = _time.time() - t0
+            print(f"    [transcribe] bailian timeout ({elapsed:.1f}s)")
+            if record_timing:
+                record_timing("transcribe_bailian", elapsed, {"ok": False, "err": "timeout"})
+            return ""
+        except Exception as e:
+            elapsed = _time.time() - t0
+            print(f"    [transcribe] bailian error: {e} ({elapsed:.1f}s)")
+            if record_timing:
+                record_timing("transcribe_bailian", elapsed, {"ok": False, "err": str(e)[:80]})
             return ""
 
 

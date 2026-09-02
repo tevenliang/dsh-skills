@@ -323,6 +323,16 @@ def run_supervised(sub_cmd: list[str], extra_env: dict | None = None, reset: boo
                         action_monitor.touch({"phase": None, "blogger": None, "progress": "skip"})
                     break
 
+            # ── 转录计时解析: [transcribe] Groq success: N chars (Xs) ────────
+            # 格式: [transcribe] Groq success: 504 chars (3.2s)
+            #       [transcribe] bailian success: 843 chars (8.1s)
+            _tm = re.search(r"\[transcribe\]\s+(Groq|bailian)\s+success:\s+\d+\s+chars\s+\(([\d.]+)s\)", line)
+            if _tm:
+                _provider = _tm.group(1).lower()  # "groq" or "bailian"
+                _elapsed = float(_tm.group(2))
+                from state import record_timing
+                record_timing(f"transcribe_{_provider}", _elapsed, {"ok": True})
+
             # ── 异常模式匹配 + 恢复决策 ──────────────────────────────────
             action = react(line)
             if action:

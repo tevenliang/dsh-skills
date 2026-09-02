@@ -23,7 +23,7 @@ disable-model-invocation: true
 ## 架构
 
 ```
-~/.agents/skills/System/usage-check/scripts/
+/home/ubuntu/.dsh/skills/usage-check/scripts/
 ├── usage-check.sh           # ⭐ 统一入口
 ├── minimax-check.sh         # MiniMax Coding Plan
 ├── tavily-check.sh          # Tavily API
@@ -37,31 +37,31 @@ disable-model-invocation: true
 
 ```bash
 # 默认：人类可读汇总（all = minimax + vm + tavily + openrouter）
-bash ~/.agents/skills/System/usage-check/scripts/usage-check.sh
+bash /home/ubuntu/.dsh/skills/usage-check/scripts/usage-check.sh
 
 # 合并 JSON 输出（适合 cron / 日志）
-bash ~/.agents/skills/System/usage-check/scripts/usage-check.sh all json
+bash /home/ubuntu/.dsh/skills/usage-check/scripts/usage-check.sh all json
 
 # 单模块
-bash ~/.agents/skills/System/usage-check/scripts/usage-check.sh minimax
-bash ~/.agents/skills/System/usage-check/scripts/usage-check.sh tavily
-bash ~/.agents/skills/System/usage-check/scripts/usage-check.sh openrouter
-bash ~/.agents/skills/System/usage-check/scripts/usage-check.sh vm
+bash /home/ubuntu/.dsh/skills/usage-check/scripts/usage-check.sh minimax
+bash /home/ubuntu/.dsh/skills/usage-check/scripts/usage-check.sh tavily
+bash /home/ubuntu/.dsh/skills/usage-check/scripts/usage-check.sh openrouter
+bash /home/ubuntu/.dsh/skills/usage-check/scripts/usage-check.sh vm
 
 # 单模块 + JSON
-bash ~/.agents/skills/System/usage-check/scripts/usage-check.sh minimax json
-bash ~/.agents/skills/System/usage-check/scripts/usage-check.sh tavily json
-bash ~/.agents/skills/System/usage-check/scripts/usage-check.sh openrouter json
-bash ~/.agents/skills/System/usage-check/scripts/usage-check.sh vm json
+bash /home/ubuntu/.dsh/skills/usage-check/scripts/usage-check.sh minimax json
+bash /home/ubuntu/.dsh/skills/usage-check/scripts/usage-check.sh tavily json
+bash /home/ubuntu/.dsh/skills/usage-check/scripts/usage-check.sh openrouter json
+bash /home/ubuntu/.dsh/skills/usage-check/scripts/usage-check.sh vm json
 ```
 
 ### 单脚本独立调用
 
 ```bash
-bash ~/.agents/skills/System/usage-check/scripts/minimax-check.sh
-bash ~/.agents/skills/System/usage-check/scripts/tavily-check.sh
-bash ~/.agents/skills/System/usage-check/scripts/openrouter-check.sh
-python3 ~/.agents/skills/System/usage-check/scripts/vm-check.py
+bash /home/ubuntu/.dsh/skills/usage-check/scripts/minimax-check.sh
+bash /home/ubuntu/.dsh/skills/usage-check/scripts/tavily-check.sh
+bash /home/ubuntu/.dsh/skills/usage-check/scripts/openrouter-check.sh
+python3 /home/ubuntu/.dsh/skills/usage-check/scripts/vm-check.py
 ```
 
 ## 前置条件

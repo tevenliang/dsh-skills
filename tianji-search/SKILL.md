@@ -91,10 +91,10 @@ queries = {
 
 ```bash
 # 全维度查询（工商/股东/风险/融资/新闻/联系方式）
-python ~/.agents/skills/Search/tianji-search/scripts/business_query.py "公司全称"
+python /home/ubuntu/.dsh/skills/tianji-search/scripts/business_query.py "公司全称"
 
 # 仅查指定维度
-python ~/.agents/skills/Search/tianji-search/scripts/business_query.py "公司全称" --type risk --count 8
+python /home/ubuntu/.dsh/skills/tianji-search/scripts/business_query.py "公司全称" --type risk --count 8
 ```
 
 注意：若由 agent 直接执行查询，也可跳过脚本、直接用联网搜索（WebSearch）取数后整理成报告，效果一致。

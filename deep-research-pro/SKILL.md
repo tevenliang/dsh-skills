@@ -38,8 +38,8 @@ disable-model-invocation: true
 
 | 步骤 | 工具 |
 |------|------|
-| 国内搜索 | `python3 ~/.agents/skills/Search/tencent-yuanbao-search/scripts/websearch.py --query="..."` |
-| 海外搜索 | `python3 ~/.agents/skills/Search/tavily-search/scripts/tavily_search.py "..." --depth advanced --max-results 8` |
+| 国内搜索 | `python3 /home/ubuntu/.dsh/skills/tencent-yuanbao-search/scripts/websearch.py --query="..."` |
+| 海外搜索 | `python3 /home/ubuntu/.dsh/skills/tavily-search/scripts/tavily_search.py "..." --depth advanced --max-results 8` |
 | 全文抓取 | `curl -sL <url> \| python3 -c '...'`（提取正文） |
 | 输出目录 | `~/Documents/steven_vault/02_work_notes/report/<slug>/`（自动 mkdir -p） |
 
@@ -70,14 +70,14 @@ disable-model-invocation: true
 **国内搜索（元宝）**：
 
 ```bash
-python3 ~/.agents/skills/Search/tencent-yuanbao-search/scripts/websearch.py \
+python3 /home/ubuntu/.dsh/skills/tencent-yuanbao-search/scripts/websearch.py \
   --query="Similarweb 中国客户 出海企业" --freshness='year'
 ```
 
 **海外搜索（tavily）**：
 
 ```bash
-python3 ~/.agents/skills/Search/tavily-search/scripts/tavily_search.py \
+python3 /home/ubuntu/.dsh/skills/tavily-search/scripts/tavily_search.py \
   "Similarweb competitors Sensor Tower market share" \
   --depth advanced --max-results 8
 ```

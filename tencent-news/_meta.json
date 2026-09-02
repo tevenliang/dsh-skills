@@ -1,0 +1,16 @@
+{
+  "name": "tencent-news",
+  "description": "腾讯新闻 - 7×24热点新闻搜索",
+  "search": true,
+  "requires": {
+    "bins": ["sh"],
+    "env": []
+  },
+  "call": {
+    "kind": "shell",
+    "template": "bash {skill_dir}/scripts/run-cli.sh search '<QUERY>'",
+    "params": {
+      "query": "string (required)"
+    }
+  }
+}

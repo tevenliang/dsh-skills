@@ -33,5 +33,5 @@ AI 优化的搜索引擎，专为 LLM 设计。相比传统搜索 API，提供 A
 ## 使用方法
 
 ```bash
-python3 ~/.agents/skills/Search/tavily-search/scripts/tavily_search.py "搜索关键词" [选项]
+python3 /home/ubuntu/.dsh/skills/tavily-search/scripts/tavily_search.py "搜索关键词" [选项]
 ```

@@ -3,7 +3,7 @@
 """
 platforms/douyin/crawler.py — 抖音爬虫
 
-使用 a_bogus 签名调用抖音 Web API
+使用 a_bogus 签名调用抖音 Web API（直接复用 Mac 库，签名方式完全一致）
 """
 import asyncio
 import sys
@@ -15,8 +15,8 @@ from typing import Optional, List, Dict
 import httpx
 
 
-# a_bogus 签名模块路径
-ABOGUS_PATH = Path.home() / ".dsh" / "skills" / "crawl" / "ingest-douyin" / "douyin_api" / "crawlers" / "douyin" / "web" / "abogus.py"
+# a_bogus 签名模块路径（Mac 同款）
+ABOGUS_PATH = Path.home() / ".dsh" / "skills" / "crawl" / "ingest-douyin" / "douyin_api" / "crawlers" / "douyin" / "web"
 
 
 class DouyinCrawler:
@@ -26,28 +26,31 @@ class DouyinCrawler:
         self.cookie = cookie
         self.proxy = proxy
         
-        # 动态导入 a_bogus
-        sys.path.insert(0, str(ABOGUS_PATH.parent))
-        from abogus import ABogus
-        self.abogus = ABogus()
+        # 动态导入 Mac 同款签名模块
+        sys.path.insert(0, str(ABOGUS_PATH.parent.parent.parent))  # douyin_api/
+        from crawlers.douyin.web.utils import BogusManager
+        self._bogus = BogusManager
         
         self.headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+            "Accept-Language": "zh-CN,zh;q=0.8,zh-TW;q=0.7,zh-HK;q=0.5,en-US;q=0.3,en;q=0.2",
             "Cookie": cookie,
             "Referer": "https://www.douyin.com/",
         }
+        self._bogus_ua = self.headers["User-Agent"]
     
     def _sign_url(self, url: str, params: dict) -> str:
-        """使用 a_bogus 签名 URL"""
-        a_bogus = self.abogus.get_value(params)
-        return url + "?" + urlencode(params) + "&a_bogus=" + quote(a_bogus, safe='')
+        """使用 a_bogus 签名 URL（Mac 同款 BogusManager）"""
+        params_with_token = {**params, "msToken": ""}
+        a_bogus = self._bogus.ab_model_2_endpoint(params_with_token, self._bogus_ua)
+        return url + "?" + urlencode(params) + "&a_bogus=" + a_bogus
     
     async def fetch_video_detail(self, aweme_id: str) -> Optional[Dict]:
-        """获取视频详情
-        
+        """获取视频详情（带退避重试，防止安全插件拦截）
+
         Args:
             aweme_id: 视频 ID
-            
+
         Returns:
             视频详情 dict，失败返回 None
         """
@@ -61,19 +64,56 @@ class DouyinCrawler:
             "version_code": "170400",
             "version_name": "17.4.0",
         }
-        
-        signed_url = self._sign_url(url, params)
-        
-        async with httpx.AsyncClient(proxy=self.proxy, timeout=15, follow_redirects=True) as client:
-            resp = await client.get(signed_url, headers=self.headers)
-            data = resp.json()
-        
-        aweme_detail = data.get("aweme_detail", {})
-        if not aweme_detail:
-            print(f"    [douyin] fetch_video_detail failed: code={data.get('status_code')}, msg={data.get('status_msg', '')}")
+
+        _backoff = (5, 15, 30)  # 退避秒数
+        _last_err = ""
+
+        for _att in range(1, 4):
+            signed_url = self._sign_url(url, params)
+
+            async with httpx.AsyncClient(proxy=self.proxy, timeout=15, follow_redirects=True) as client:
+                resp = await client.get(signed_url, headers=self.headers)
+
+                # 403 = 安全插件拦截 / uid_tt 失效
+                if resp.status_code == 403:
+                    body = resp.text[:300] if resp.text else "empty"
+                    if "Uifid Not Found" in body or "Argus" in body:
+                        _last_err = f"403 安全插件拦截 (uid_tt 失效或风控)"
+                        if _att < 3:
+                            wait = _backoff[_att - 1]
+                            print(f"    [douyin] fetch_video_detail 403 安全拦截({_att}/3), {wait}s 后重试…")
+                            await asyncio.sleep(wait)
+                            continue
+                        print(f"    [douyin] fetch_video_detail 403 安全拦截, 重试耗尽: {_last_err}")
+                        return None
+                    else:
+                        print(f"    [douyin] fetch_video_detail 403: {body[:100]}")
+                        return None
+
+                try:
+                    data = resp.json()
+                except Exception as e:
+                    _last_err = f"JSON 解析失败: {e}, status={resp.status_code}"
+                    if resp.status_code == 0 and not resp.text:
+                        # 空 body 也退避重试
+                        if _att < 3:
+                            wait = _backoff[_att - 1]
+                            print(f"    [douyin] fetch_video_detail 空响应({_att}/3), {wait}s 后重试…")
+                            await asyncio.sleep(wait)
+                            continue
+                    print(f"    [douyin] fetch_video_detail {_last_err}")
+                    return None
+
+            aweme_detail = data.get("aweme_detail", {})
+            if aweme_detail:
+                return aweme_detail
+
+            # aweme_detail 为空但没报错，也算失败
+            msg = data.get("status_msg", "") or data.get("status_code", "")
+            print(f"    [douyin] fetch_video_detail aweme_detail 为空: {msg}")
             return None
-        
-        return aweme_detail
+
+        return None
     
     async def get_user_videos(self, sec_user_id: str = "", max_cursor: str = "0", count: int = 30,
                                   recent_days: int = 7, max_retry: int = 3) -> List[Dict]:
