@@ -54,8 +54,12 @@ image_storage:
 
 # 爬虫配置
 crawler:
-  # 同一 IP 请求间隔（秒），防止被风控
-  request_delay: 2
+  # 同一 IP 请求间隔（秒），防止被风控 (2026-09-02 拉长: XHS 曾因 2s 过密触发反爬吊销 cookie)
+  request_delay: 5
+  # 小红书专用间隔 (更保守, xhs-cli 底层 + 列表/详情请求较多)
+  xhs_request_delay: 10
+  # 博主之间间隔（秒）
+  author_delay: 20
   # 最大重试次数
   max_retries: 3
   # 单次最多处理视频数（0 = 不限制）

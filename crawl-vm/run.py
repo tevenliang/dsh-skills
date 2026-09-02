@@ -444,7 +444,8 @@ async def process_xiaohongshu_note(crawler: XiaohongshuCrawler, note_card: Dict,
     Returns:
         (ok, was_skipped)
     """
-    delay = config.get("crawler", {}).get("request_delay", 2)
+    delay = config.get("crawler", {}).get("xhs_request_delay",
+                     config.get("crawler", {}).get("request_delay", 5))
 
     note_id = note_card.get("note_id", "")
     xsec_token = note_card.get("xsec_token", "")
@@ -800,12 +801,17 @@ async def run_platform(platform: str, config: dict, publisher: VaultPublisher,
         
         elif author_ids:
             # 从博主获取笔记列表
+            author_delay = config.get("crawler", {}).get("author_delay", 20)
+            xhs_delay = config.get("crawler", {}).get("xhs_request_delay",
+                          config.get("crawler", {}).get("request_delay", 5))
             for user_id in author_ids:
                 print(f"\nFetching notes for xiaohongshu user: {user_id}")
                 try:
                     notes = await crawler.get_user_notes(user_id, num=20)
                 except Exception as e:
                     print(f"  Failed to fetch notes: {e}")
+                    # 出错也等间隔, 避免快速重试雪崩
+                    await asyncio.sleep(author_delay)
                     continue
                 print(f"  Found {len(notes)} notes")
                 
@@ -828,7 +834,11 @@ async def run_platform(platform: str, config: dict, publisher: VaultPublisher,
                                     break
                             else:
                                 consecutive_skipped = 0
-                            await asyncio.sleep(delay)
+                            await asyncio.sleep(xhs_delay)
+                # 博主之间间隔 (防止连续拉多个博主触发风控)
+                if author_ids and user_id != author_ids[-1]:
+                    print(f"  [xhs] waiting {author_delay}s before next author...")
+                    await asyncio.sleep(author_delay)
 
 
 async def main():

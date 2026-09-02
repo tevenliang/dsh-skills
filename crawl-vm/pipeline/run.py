@@ -13,16 +13,18 @@ import argparse
 import asyncio
 import json
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
 import time
+import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 
 # 添加模块路径
-SKILL_DIR = Path(__file__).resolve().parent.parent  # /home/ubuntu/.dsh/skills/crawl-vm
+SKILL_DIR = Path(__file__).resolve().parent.parent  # /home/ubuntu/.dsh/skills/crawl-vm (pipeline 在子目录)
 sys.path.insert(0, str(SKILL_DIR))
 sys.path.insert(0, str(SKILL_DIR / "common"))
 
@@ -31,6 +33,7 @@ from common.watchlist import parse_watchlist
 from common.transcribe import TranscriptionService, convert_to_wav
 from common.summarize import SummarizationService
 from common.publish_vault import VaultPublisher
+from common.picgo_uploader import upload_paths as picgo_upload_paths
 
 from platforms.douyin.crawler import DouyinCrawler
 from platforms.bilibili.crawler import BilibiliCrawler
@@ -441,7 +444,8 @@ async def process_xiaohongshu_note(crawler: XiaohongshuCrawler, note_card: Dict,
     Returns:
         (ok, was_skipped)
     """
-    delay = config.get("crawler", {}).get("request_delay", 2)
+    delay = config.get("crawler", {}).get("xhs_request_delay",
+                     config.get("crawler", {}).get("request_delay", 5))
 
     note_id = note_card.get("note_id", "")
     xsec_token = note_card.get("xsec_token", "")
@@ -497,16 +501,28 @@ async def process_xiaohongshu_note(crawler: XiaohongshuCrawler, note_card: Dict,
     audio_url = crawler.get_audio_url(detail)
     image_urls = crawler.get_image_urls(detail) if not audio_url else []
 
-    # 3b. 下载图片到 vault media 目录 (用于图文笔记)
+    # 3b. 处理图片: 默认走 PicGo→COS (拿 URL), 失败兜底保留本地
     image_links = []
     if image_urls:
-        # 文件名格式: <date>_<time>_<author>_<title>_<n>.<ext>
+        # 文件名格式: <date>_<time>_<author>_<title>_<n>.<ext> (对齐 mac 格式)
         safe_author = re.sub(r'[^\w\u4e00-\u9fff]', '', author) or "未知作者"
         safe_title_short = re.sub(r'[^\w\u4e00-\u9fff]', '', title)[:40]
-        media_dir = publisher.subscription_dir.parent / "media" / "xhs"
-        media_dir.mkdir(parents=True, exist_ok=True)
+
+        image_storage_cfg = config.get("image_storage", {}) or {}
+        use_cos = image_storage_cfg.get("enabled", True) and image_storage_cfg.get("provider") == "picgo"
+        on_failure = image_storage_cfg.get("on_failure", "fall_back_local")
+
+        if use_cos:
+            # COS 模式: 下载到 temp_dir, 批量 picgo upload, 拿 URL
+            temp_dir = Path(image_storage_cfg.get("temp_dir", "/tmp/crawl-images"))
+            temp_dir.mkdir(parents=True, exist_ok=True)
+        else:
+            # 本地模式: 直接下到 vault/media/xhs/ (旧行为)
+            media_dir = publisher.subscription_dir.parent / "media" / "xhs"
+            media_dir.mkdir(parents=True, exist_ok=True)
 
         print(f"    Downloading {len(image_urls)} images...")
+        temp_paths: List[Path] = []
         for idx, img_url in enumerate(image_urls, 1):
             # 判断扩展名 (XHS URL 通常带 !nc_n_webp_mw_1 等, 但 content-type 是 webp)
             ext = "png"  # mac 老程序都用 .png 后缀
@@ -515,20 +531,61 @@ async def process_xiaohongshu_note(crawler: XiaohongshuCrawler, note_card: Dict,
             elif ".webp" in img_url.lower() or "_webp" in img_url.lower():
                 ext = "webp"
 
-            # 文件名: <date>_<time>_<author>_<title>_<n>.<ext> (对齐 mac 格式)
-            img_file = media_dir / f"{image_date}_{image_time}_{safe_author}_{safe_title_short}_{idx}.{ext}"
+            if use_cos:
+                # temp 文件: <uuid>.<ext> (避免重名)
+                dest = temp_dir / f"{uuid.uuid4().hex}.{ext}"
+            else:
+                dest = media_dir / f"{image_date}_{image_time}_{safe_author}_{safe_title_short}_{idx}.{ext}"
+
             ok = await _download_url_to_file(
-                img_url, img_file,
+                img_url, dest,
                 crawler.headers_base.get("User-Agent", DEFAULT_UA),
                 "https://www.xiaohongshu.com/",
             )
-            if ok and img_file.exists() and img_file.stat().st_size > 0:
-                # wikilink 格式: media/xhs/<file>
-                rel_path = f"media/xhs/{img_file.name}"
-                image_links.append(rel_path)
-                print(f"      [{idx}/{len(image_urls)}] ✅ {img_file.stat().st_size} bytes")
+            if ok and dest.exists() and dest.stat().st_size > 0:
+                if use_cos:
+                    temp_paths.append(dest)
+                    print(f"      [{idx}/{len(image_urls)}] ✅ {dest.stat().st_size} bytes → temp")
+                else:
+                    rel_path = f"media/xhs/{dest.name}"
+                    image_links.append(rel_path)
+                    print(f"      [{idx}/{len(image_urls)}] ✅ {dest.stat().st_size} bytes")
             else:
                 print(f"      [{idx}/{len(image_urls)}] ❌ download failed")
+                if dest.exists():
+                    dest.unlink(missing_ok=True)
+
+        # 批量上传到 COS
+        if use_cos and temp_paths:
+            print(f"    Uploading {len(temp_paths)} images to COS via PicGo...")
+            success_urls, failed_paths = picgo_upload_paths(temp_paths)
+            for i, url in enumerate(success_urls):
+                image_links.append(url)
+                print(f"      ✅ {url}")
+            for fp in failed_paths:
+                if on_failure == "fail":
+                    print(f"      ❌ 上传失败 (fail 模式): {fp.name}")
+                else:
+                    # fall_back_local: 移动到 vault/media/xhs/
+                    media_dir = publisher.subscription_dir.parent / "media" / "xhs"
+                    media_dir.mkdir(parents=True, exist_ok=True)
+                    # 重新生成语义化文件名 (对齐 mac 格式)
+                    idx_in_orig = temp_paths.index(fp) + 1  # 在原图列表里的位置
+                    ext = fp.suffix.lstrip(".")
+                    final_name = f"{image_date}_{image_time}_{safe_author}_{safe_title_short}_{idx_in_orig}.{ext}"
+                    final_path = media_dir / final_name
+                    try:
+                        shutil.move(str(fp), str(final_path))
+                        rel_path = f"media/xhs/{final_name}"
+                        image_links.append(rel_path)
+                        print(f"      ⚠️ 上传失败, 回退到本地: {final_name}")
+                    except Exception as e:
+                        print(f"      ❌ 本地兜底也失败: {e}")
+                        fp.unlink(missing_ok=True)
+            # 清理成功上传的 temp 文件
+            for tp in temp_paths:
+                if tp not in failed_paths:
+                    tp.unlink(missing_ok=True)
 
     # 3c. 处理笔记类型
     wav_path = None
@@ -744,12 +801,17 @@ async def run_platform(platform: str, config: dict, publisher: VaultPublisher,
         
         elif author_ids:
             # 从博主获取笔记列表
+            author_delay = config.get("crawler", {}).get("author_delay", 20)
+            xhs_delay = config.get("crawler", {}).get("xhs_request_delay",
+                          config.get("crawler", {}).get("request_delay", 5))
             for user_id in author_ids:
                 print(f"\nFetching notes for xiaohongshu user: {user_id}")
                 try:
                     notes = await crawler.get_user_notes(user_id, num=20)
                 except Exception as e:
                     print(f"  Failed to fetch notes: {e}")
+                    # 出错也等间隔, 避免快速重试雪崩
+                    await asyncio.sleep(author_delay)
                     continue
                 print(f"  Found {len(notes)} notes")
                 
@@ -772,7 +834,11 @@ async def run_platform(platform: str, config: dict, publisher: VaultPublisher,
                                     break
                             else:
                                 consecutive_skipped = 0
-                            await asyncio.sleep(delay)
+                            await asyncio.sleep(xhs_delay)
+                # 博主之间间隔 (防止连续拉多个博主触发风控)
+                if author_ids and user_id != author_ids[-1]:
+                    print(f"  [xhs] waiting {author_delay}s before next author...")
+                    await asyncio.sleep(author_delay)
 
 
 async def main():
