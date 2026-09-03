@@ -80,10 +80,10 @@
 3. 按文件类型选择上传方式：
 
 **常规文件（docx/pdf/pptx/xlsx 等）**：
-`upload_file(drive_id=知识库drive_id, parent_id=目标文件夹id, name="文件名.docx", content_base64=...)`
+`upload_new_file(drive_id=知识库drive_id, parent_id=目标文件夹id, name="文件名.docx", content_base64=...)`
 
 **Markdown 文件（.md）**：
-> 默认转为在线智能文档，保留格式和结构化内容。仅当用户明确要求"上传并保持 md 格式"时，才使用 `upload_file` 直接上传原始 `.md` 文件。
+> 默认转为在线智能文档，保留格式和结构化内容。仅当用户明确要求"上传并保持 md 格式"时，才使用 `upload_new_file` 直接上传原始 `.md` 文件。
 
 - `kwiki.create_item(doc_type="o", kuid=目标文件夹kuid, title="文件名（不含后缀）")` 创建智能文档
 - 读取本地 `.md` 文件内容
@@ -113,7 +113,7 @@
 2. `curl.exe -L -o "文件名" "签名URL"` 下载
 
 **智能文档（doc_type="o"）**：`wps.export` 不支持直接导出，无特殊情况，默认转换成Markdown格式：
-- **Markdown** → `read_file(file_id=...)`（`status=pending` 时用 `task_id` 续读），将 `data.content` 保存为 `.md` 文件
+- **Markdown** → `read_file(file_id=...)`；`status=pending` 时用本次响应的 `task_id` 和原参数获取结果，返回完整内容后，将 `data.content` 保存为 `.md` 文件
 
 **快捷方式文件（type="shortcut"）**：通过 `search_files` 搜索原始文件名找到源文件，再用源文件的 `link_id` 走上述通用流程。
 
@@ -182,13 +182,13 @@
 **流程**
 1. 主流程：scrape_url → scrape_progress(status=1) → move_file → get_file_link
 2. 降级流程（scrape_url 失败/status=-1，如公众号等 JS 渲染页面）：
-   browser 抓取正文 → create_file(name=xxx.docx)
-   → upload_file(drive_id=xxx parent_id=0 file_id=xxx content_format=markdown content_base64=xxx)
+   browser 抓取正文
+   → create_file_with_content(name="标题.docx", content=<抓取 Markdown 明文>)
    → move_file → get_file_link
 
 | 注意 | 说明 |
 |------|------|
-| upload_file 必填参数 | `drive_id` 和 `parent_id` 必须显式传递 |
+| 降级新建 | 用 create_file_with_content；content 为 Markdown 明文，不需要进行 Base64 编码 |
 | ID 体系 | kwiki 内部 kuid 需通过 `kwiki.list_items` 获取 |
 
 ## 错误速查表

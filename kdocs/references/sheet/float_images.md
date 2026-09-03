@@ -7,9 +7,7 @@
 查询工作表中的浮动图片列表。
 适用于盘点当前工作表里的插图、附件图片或外链图片。
 
-
-
-#### 操作约束
+#### 调用约束
 
 - **前置检查**：使用该工具前必须先调用get_sheets_info确认要操作的工作表id，不得自行捏造工作表id。
 
@@ -28,10 +26,11 @@
 }
 ```
 
-
 #### 参数说明
 
-- `file_id` (string, 必填): 文件 ID
+- `url` (string, 三选一必填: `url` / `link_id` / `file_id`): 文档 URL
+- `link_id` (string, 三选一必填: `url` / `link_id` / `file_id`): 分享链接 ID
+- `file_id` (string, 三选一必填: `url` / `link_id` / `file_id`): 文件 ID
 - `worksheet_id` (integer, 必填): 工作表 ID
 
 #### 返回值说明
@@ -70,8 +69,7 @@
 
 获取指定浮动图片的详情。适用于在修改图片位置、尺寸或来源前读取当前信息。
 
-
-#### 操作约束
+#### 调用约束
 
 - **前置检查**：使用该工具前必须先调用get_sheets_info确认要操作的工作表id，不得自行捏造工作表id。
 
@@ -91,10 +89,11 @@
 }
 ```
 
-
 #### 参数说明
 
-- `file_id` (string, 必填): 文件 ID
+- `url` (string, 三选一必填: `url` / `link_id` / `file_id`): 文档 URL
+- `link_id` (string, 三选一必填: `url` / `link_id` / `file_id`): 分享链接 ID
+- `file_id` (string, 三选一必填: `url` / `link_id` / `file_id`): 文件 ID
 - `worksheet_id` (integer, 必填): 工作表 ID
 - `float_image_id` (integer, 必填): 浮动图片 ID
 
@@ -132,8 +131,7 @@
 
 在工作表中创建浮动图片。支持通过附件、上传文件或外链 URL 的方式插入图片，并指定初始位置与尺寸。
 
-
-#### 操作约束
+#### 调用约束
 
 - **前置检查**：使用该工具前必须先调用get_sheets_info确认要操作的工作表id，不得自行捏造工作表id。
 
@@ -159,7 +157,6 @@
 }
 ```
 
-
 #### 参数说明
 
 - `file_id` (string, 必填): 文件 ID
@@ -178,7 +175,6 @@
 - `tag=sheet_pic_type_url` 时通常配合 `url`
 - `tag=sheet_pic_type_attachment` 时通常配合 `attachment_id` 或 `upload_id`
 - `frontend_lt` 可用于按行列对齐图片左上角
-
 
 #### 返回值说明
 
@@ -202,8 +198,7 @@
 
 修改浮动图片的位置或尺寸。支持按像素坐标调整，也支持通过前端行列锚点重新定位。
 
-
-#### 操作约束
+#### 调用约束
 
 - **前置检查**：使用该工具前必须先调用get_sheets_info确认要操作的工作表id，不得自行捏造工作表id。
 
@@ -227,10 +222,11 @@
 }
 ```
 
-
 #### 参数说明
 
-- `file_id` (string, 必填): 文件 ID
+- `url` (string, 三选一必填: `url` / `link_id` / `file_id`): 文档 URL
+- `link_id` (string, 三选一必填: `url` / `link_id` / `file_id`): 分享链接 ID
+- `file_id` (string, 三选一必填: `url` / `link_id` / `file_id`): 文件 ID
 - `worksheet_id` (integer, 必填): 工作表 ID
 - `float_image_id` (integer, 必填): 浮动图片 ID
 - `left` (integer, 可选): 矩形左边界 X 坐标
@@ -260,8 +256,7 @@
 
 删除指定的浮动图片。适用于清理工作表中的装饰图、附件图或误插入的图片。
 
-
-#### 操作约束
+#### 调用约束
 
 - **前置检查**：`sheet.list_float_images` 或 `sheet.get_float_image` 确认目标浮动图片
 - **前置检查**：使用该工具前必须先调用get_sheets_info确认要操作的工作表id，不得自行捏造工作表id。
@@ -281,10 +276,11 @@
 }
 ```
 
-
 #### 参数说明
 
-- `file_id` (string, 必填): 文件 ID
+- `url` (string, 三选一必填: `url` / `link_id` / `file_id`): 文档 URL
+- `link_id` (string, 三选一必填: `url` / `link_id` / `file_id`): 分享链接 ID
+- `file_id` (string, 三选一必填: `url` / `link_id` / `file_id`): 文件 ID
 - `worksheet_id` (integer, 必填): 工作表 ID
 - `float_image_id` (integer, 必填): 浮动图片 ID
 
@@ -294,7 +290,3 @@
 {}
 
 ```
-
-
----
-

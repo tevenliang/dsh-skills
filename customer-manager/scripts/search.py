@@ -35,6 +35,21 @@ from formatter import (
 )
 
 
+# 外部 CLI（qcc/tyc）走天眼查/企查查的 API，国内合规风控会把 mihomo 代理出口 IP
+# （Cloudflare 隧道 IP）当成境外封掉（HTTP 419 bannedLocation）。子进程必须直连。
+_NO_PROXY_ENV_KEYS = ("HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy",
+                      "ALL_PROXY", "all_proxy", "NO_PROXY", "no_proxy")
+_NO_PROXY_DOMAINS = "127.0.0.1,localhost,::1,capi.tianyancha.com,mcp.tianyancha.com,agent.qcc.com,data.shuidi.cn"
+
+
+def _run_cli_no_proxy(cmd, *, timeout=15):
+    """subprocess.run wrapper: 临时去掉代理环境变量,避免 mihomo 出口被风控。"""
+    env = {k: v for k, v in os.environ.items() if k not in _NO_PROXY_ENV_KEYS}
+    env["NO_PROXY"] = _NO_PROXY_DOMAINS
+    env["no_proxy"] = _NO_PROXY_DOMAINS
+    return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, env=env)
+
+
 # ─── 外部级联查询 ──────────────────────────────────────────────────────────
 
 def cascade_lookup(keyword: str) -> str:
@@ -44,9 +59,9 @@ def cascade_lookup(keyword: str) -> str:
 
     # Stage 1: qcc
     try:
-        qcc_proc = subprocess.run(
+        qcc_proc = _run_cli_no_proxy(
             ["qcc", "company", "get_company_registration_info", keyword],
-            capture_output=True, text=True, timeout=15,
+            timeout=15,
         )
         if qcc_proc.returncode == 0 and qcc_proc.stdout.strip():
             out_lines = qcc_proc.stdout.strip().split("\n")
@@ -85,9 +100,9 @@ def cascade_lookup(keyword: str) -> str:
     # Stage 2: tyc
     tyc_hit = False
     try:
-        sp = subprocess.run(
+        sp = _run_cli_no_proxy(
             ["tyc", "company", "companies", keyword, "--pageNum", "1", "--pageSize", "3"],
-            capture_output=True, text=True, timeout=15,
+            timeout=15,
         )
         candidates = []
         if sp.returncode == 0 and sp.stdout.strip():
@@ -101,9 +116,9 @@ def cascade_lookup(keyword: str) -> str:
             except:
                 pass
         exact = candidates[0]["name"] if candidates else keyword
-        rp = subprocess.run(
+        rp = _run_cli_no_proxy(
             ["tyc", "company", "registration-info", exact],
-            capture_output=True, text=True, timeout=15,
+            timeout=15,
         )
         if rp.returncode == 0 and rp.stdout.strip():
             try:

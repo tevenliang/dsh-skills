@@ -6,8 +6,7 @@
 
 获取工作表上的条件格式规则列表。适用于在新增、调整或清除条件格式前先查看当前配置。
 
-
-#### 操作约束
+#### 调用约束
 
 - **前置检查**：使用该工具前必须先调用get_sheets_info确认要操作的工作表id，不得自行捏造工作表id。
 
@@ -26,10 +25,11 @@
 }
 ```
 
-
 #### 参数说明
 
-- `file_id` (string, 必填): 文件 ID
+- `url` (string, 三选一必填: `url` / `link_id` / `file_id`): 文档 URL
+- `link_id` (string, 三选一必填: `url` / `link_id` / `file_id`): 分享链接 ID
+- `file_id` (string, 三选一必填: `url` / `link_id` / `file_id`): 文件 ID
 - `worksheet_id` (integer, 必填): 工作表 ID
 
 #### 返回值说明
@@ -68,8 +68,7 @@
 
 为工作表创建条件格式规则。适用于按单元格值、公式或其他条件自动高亮显示数据。
 
-
-#### 操作约束
+#### 调用约束
 
 - **前置检查**：先 get_conditional_format_rules 查看现有规则，避免规则冲突
 - **前置检查**：使用该工具前必须先调用get_sheets_info确认要操作的工作表id，不得自行捏造工作表id。
@@ -196,10 +195,11 @@
 }
 ```
 
-
 #### 参数说明
 
-- `file_id` (string, 必填): 文件 ID
+- `url` (string, 三选一必填: `url` / `link_id` / `file_id`): 文档 URL
+- `link_id` (string, 三选一必填: `url` / `link_id` / `file_id`): 分享链接 ID
+- `file_id` (string, 三选一必填: `url` / `link_id` / `file_id`): 文件 ID
 - `worksheet_id` (integer, 必填): 工作表 ID
 - `rule` (object, 必填): 条件格式规则对象
 
@@ -324,7 +324,6 @@
 }
 ```
 
-
 #### 返回值说明
 
 ```json
@@ -341,15 +340,17 @@
 
 更新现有条件格式规则。适用于调整判断条件、作用区域或命中后的显示样式。
 
+#### 工具选择
 
-#### 操作约束
+- **适用**：更新已有条件格式规则时
+- **勿用**（改用 `sheet.delete_conditional_format_rules`）：批量清除某些区域的条件格式
+
+#### 调用约束
 
 - **前置检查**：先 get_conditional_format_rules 获取现有规则 ID
 - **前置检查**：使用该工具前必须先调用get_sheets_info确认要操作的工作表id，不得自行捏造工作表id。
 
 **幂等性**：是
-
-> 若需要批量清除某些区域的条件格式，请改用 `sheet.delete_conditional_format_rules`
 
 #### 调用示例
 
@@ -379,15 +380,15 @@
 }
 ```
 
-
 #### 参数说明
 
-- `file_id` (string, 必填): 文件 ID
+- `url` (string, 三选一必填: `url` / `link_id` / `file_id`): 文档 URL
+- `link_id` (string, 三选一必填: `url` / `link_id` / `file_id`): 分享链接 ID
+- `file_id` (string, 三选一必填: `url` / `link_id` / `file_id`): 文件 ID
 - `worksheet_id` (integer, 必填): 工作表 ID
 - `rule` (object, 必填): 条件格式规则对象
 
 更新时建议在 `rule` 中保留已有规则标识，并以 `sheet.get_conditional_format_rules` 返回的结构为准进行修改。
-
 
 #### 返回值说明
 
@@ -405,8 +406,7 @@
 
 删除指定区域上的条件格式规则。适用于清理已有高亮、色阶或其他自动格式规则。
 
-
-#### 操作约束
+#### 调用约束
 
 - **前置检查**：`sheet.get_conditional_format_rules` 确认拟删规则与目标区域
 - **前置检查**：使用该工具前必须先调用get_sheets_info确认要操作的工作表id，不得自行捏造工作表id。
@@ -433,10 +433,11 @@
 }
 ```
 
-
 #### 参数说明
 
-- `file_id` (string, 必填): 文件 ID
+- `url` (string, 三选一必填: `url` / `link_id` / `file_id`): 文档 URL
+- `link_id` (string, 三选一必填: `url` / `link_id` / `file_id`): 分享链接 ID
+- `file_id` (string, 三选一必填: `url` / `link_id` / `file_id`): 文件 ID
 - `worksheet_id` (integer, 必填): 工作表 ID
 - `ranges` (array[object], 必填): 待清除条件格式的区域列表
 
@@ -446,7 +447,3 @@
 {}
 
 ```
-
-
----
-

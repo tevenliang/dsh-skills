@@ -186,7 +186,7 @@ async function main() {
     if (osName !== 'windows') fs.chmodSync(destBin, 0o755);
 
     // Record install source for analytics (X-Request-Source header)
-    fs.writeFileSync(path.join(installDir, '.source'), 'skillhub');
+    fs.writeFileSync(path.join(installDir, '.source'), 'kdocs');
 
     say(`\u2705 Installed: ${destBin}`);
 

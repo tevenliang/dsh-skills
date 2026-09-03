@@ -6,8 +6,7 @@
 
 获取指定区域内的数据校验规则。适用于读取下拉选项、输入限制或其他校验规则配置。
 
-
-#### 操作约束
+#### 调用约束
 
 - **前置检查**：使用该工具前必须先调用get_sheets_info确认要操作的工作表id，不得自行捏造工作表id。
 
@@ -30,10 +29,11 @@
 }
 ```
 
-
 #### 参数说明
 
-- `file_id` (string, 必填): 文件 ID
+- `url` (string, 三选一必填: `url` / `link_id` / `file_id`): 文档 URL
+- `link_id` (string, 三选一必填: `url` / `link_id` / `file_id`): 分享链接 ID
+- `file_id` (string, 三选一必填: `url` / `link_id` / `file_id`): 文件 ID
 - `worksheet_id` (integer, 必填): 工作表 ID
 - `col_from` (integer, 必填): 起始列索引
 - `col_to` (integer, 必填): 结束列索引
@@ -76,8 +76,7 @@
 
 为指定区域创建数据校验规则。常见用途包括创建下拉选项、限制输入范围或设置单元格输入约束。
 
-
-#### 操作约束
+#### 调用约束
 
 - **前置检查**：先 get_data_validations 查看目标区域已有规则，避免重叠
 - **前置检查**：使用该工具前必须先调用get_sheets_info确认要操作的工作表id，不得自行捏造工作表id。
@@ -119,10 +118,11 @@
 }
 ```
 
-
 #### 参数说明
 
-- `file_id` (string, 必填): 文件 ID
+- `url` (string, 三选一必填: `url` / `link_id` / `file_id`): 文档 URL
+- `link_id` (string, 三选一必填: `url` / `link_id` / `file_id`): 分享链接 ID
+- `file_id` (string, 三选一必填: `url` / `link_id` / `file_id`): 文件 ID
 - `worksheet_id` (integer, 必填): 工作表 ID
 - `args` (object, 必填): 数据校验参数
 - `field_type` (string, 必填): 字段类型，ET 目前仅支持 `List`（下拉列表）
@@ -162,7 +162,6 @@
 | `row_from` | integer | 行起始索引位置 |
 | `row_to` | integer | 行最后索引位置（整列可传 `1048575`） |
 
-
 #### 返回值说明
 
 ```json
@@ -179,8 +178,12 @@
 
 更新指定区域的数据校验规则。适用于调整下拉候选项、校验条件或生效范围。
 
+#### 工具选择
 
-#### 操作约束
+- **适用**：更新已有数据验证规则时
+- **勿用**（改用 `sheet.delete_data_validations`）：彻底移除数据验证规则
+
+#### 调用约束
 
 - **前置检查**：先 get_data_validations 获取现有配置
 - **前置检查**：使用该工具前必须先调用get_sheets_info确认要操作的工作表id，不得自行捏造工作表id。
@@ -188,7 +191,6 @@
 **幂等性**：是
 
 > 行列索引均为 0-based
-> 若需要彻底移除规则，请改用 `sheet.delete_data_validations`
 
 #### 调用示例
 
@@ -226,10 +228,11 @@
 }
 ```
 
-
 #### 参数说明
 
-- `file_id` (string, 必填): 文件 ID
+- `url` (string, 三选一必填: `url` / `link_id` / `file_id`): 文档 URL
+- `link_id` (string, 三选一必填: `url` / `link_id` / `file_id`): 分享链接 ID
+- `file_id` (string, 三选一必填: `url` / `link_id` / `file_id`): 文件 ID
 - `worksheet_id` (integer, 必填): 工作表 ID
 - `args` (object, 必填): 数据校验参数
 - `field_type` (string, 必填): 字段类型，ET 目前仅支持 `List`（下拉列表）
@@ -271,7 +274,6 @@
 
 更新时建议先调用 `sheet.get_data_validations` 对照原有配置再修改。
 
-
 #### 返回值说明
 
 ```json
@@ -288,8 +290,7 @@
 
 删除指定区域内的数据校验规则。删除后，该区域将不再保留下拉限制或输入校验约束。
 
-
-#### 操作约束
+#### 调用约束
 
 - **前置检查**：`sheet.get_data_validations` 确认目标区域存在拟删校验规则
 - **前置检查**：使用该工具前必须先调用get_sheets_info确认要操作的工作表id，不得自行捏造工作表id。
@@ -314,10 +315,11 @@
 }
 ```
 
-
 #### 参数说明
 
-- `file_id` (string, 必填): 文件 ID
+- `url` (string, 三选一必填: `url` / `link_id` / `file_id`): 文档 URL
+- `link_id` (string, 三选一必填: `url` / `link_id` / `file_id`): 分享链接 ID
+- `file_id` (string, 三选一必填: `url` / `link_id` / `file_id`): 文件 ID
 - `worksheet_id` (integer, 必填): 工作表 ID
 - `range` (object, 必填): 目标区域范围
 
@@ -327,7 +329,3 @@
 {}
 
 ```
-
-
----
-

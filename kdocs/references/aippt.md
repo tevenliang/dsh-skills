@@ -25,8 +25,7 @@ AI PPT 仅包含一个通用接口 `aippt.execute`，通过 `task_type` 参数�
 - 每次调用超时设为 1800000 毫秒：--timeout 1800000
 
 ### 文档引用方式
-
-文档转 PPT 场景下，`input` 数组中的文档引用使用 `link_id`（从金山文档链接路径末尾提取的 link_id，无需先调 `get_share_info`）。
+文档转 PPT 场景下，`input` 数组中的文档引用使用 `link_id`。
 
 ---
 
@@ -61,17 +60,19 @@ AI PPT 仅包含一个通用接口 `aippt.execute`，通过 `task_type` 参数�
 - 最后的 `*.done` 事件携带最终生成结果：从 `upload_cloud.done` 取 `link_url`
 
 
-
-#### 操作约束
+#### 调用约束
 
 - **前置检查**：首次调用必须明确选择 task_type，并按该 skill 的交互事件继续恢复调用
-- **提示**：收到 need_interaction=true 时先收集用户答案，再发起下一次调用，避免空恢复请求
+- **前置检查**（mode=basic）：经典模式（mode=basic）必须在 text 类型 input 项传入 scene_tags 与 style_tags，各恰好 1 个预置标签；禁止省略、禁止传空数组 []、禁止自造标签
+
 
 **幂等性**：否 — 为流式生成任务，重复调用可能创建重复产物；重试前先确认是否已有进行中或已完成结果
+
 
 > `input` 与 `interaction_response` 互斥，不同时传
 > SSE 流中 `need_interaction: true` 出现时，记录 payload 后等待用户输入，再次调用
 > 最终结果从 `upload_cloud.done` payload 的 `link_url` 字段获取云文档链接
+> 收到 need_interaction=true 时先收集用户答案，再发起下一次调用，避免空恢复请求
 > `mode` 参数在首次和恢复调用中保持一致
 
 #### 调用示例
@@ -129,7 +130,7 @@ AI PPT 仅包含一个通用接口 `aippt.execute`，通过 `task_type` 参数�
 }
 ```
 
-原子化全文生成 — 主题生成（mode=basic，含风格分类标签）：
+经典模式 — 主题生成（必填 scene_tags / style_tags，各 1 个）：
 
 ```json
 {
@@ -143,20 +144,22 @@ AI PPT 仅包含一个通用接口 `aippt.execute`，通过 `task_type` 参数�
         "总结汇报"
       ],
       "style_tags": [
-        "科技风",
-        "商务风"
+        "科技风"
       ]
     }
   ]
 }
 ```
 
-原子化全文生成 — 文档生成（mode=basic，含风格分类标签）：
+经典模式 — 文档生成（默认改写，generate_type=3）：
 
 ```json
 {
   "task_type": "doc_ppt",
   "mode": "basic",
+  "options": {
+    "generate_type": 3
+  },
   "input": [
     {
       "type": "text",
@@ -169,8 +172,36 @@ AI PPT 仅包含一个通用接口 `aippt.execute`，通过 `task_type` 参数�
       ]
     },
     {
-      "type": "file_id",
-      "content": "100239253236"
+      "type": "link_id",
+      "content": "co4Kyv9Ofayq"
+    }
+  ]
+}
+```
+
+经典模式 — 文档生成（保持原文，generate_type=2）：
+
+```json
+{
+  "task_type": "doc_ppt",
+  "mode": "basic",
+  "options": {
+    "generate_type": 2
+  },
+  "input": [
+    {
+      "type": "text",
+      "content": "尽量保持原文生成PPT",
+      "scene_tags": [
+        "总结汇报"
+      ],
+      "style_tags": [
+        "简约风"
+      ]
+    },
+    {
+      "type": "link_id",
+      "content": "co4Kyv9Ofayq"
     }
   ]
 }
@@ -224,22 +255,43 @@ AI PPT 仅包含一个通用接口 `aippt.execute`，通过 `task_type` 参数�
 - `task_type` (string, 必填): 技能类型，决定执行哪条生成流水线。
 枚举值：`theme_ppt`（主题生成 PPT）/ `doc_ppt`（文档生成 PPT）/ `single_page`（单页生成幻灯片）
 
-- `mode` (string, 可选): 生成模式。`html`（HTML 渲染）/ `basic`（经典简约模式，一次调用完成）。默认 `html`
+- `mode` (string, 可选): 生成模式。`html`（HTML 渲染）/ `basic`（经典简约模式，一次调用完成）。默认 `html`。
+`basic` 时须在 `input` 的 `text` 项传入 `scene_tags`、`style_tags` 各 1 个（必填，见 `param_detail`）。
 
 - `input` (array[object], 可选): 技能输入内容数组，每项为 `{type, content, ...}` 对象。与 `interaction_response` 互斥。
 type 枚举：
 - `text`：文本指令或主题描述
-- `link_id`：从金山文档链接提取的 link_id
+- `link_id`：分享链接 ID
 
-当 `mode` 为 `basic` 时，`text` 类型的 input 项可额外携带：
-- `scene_tags`：场景标签数组，如 `["总结汇报"]`
-- `style_tags`：风格标签数组，如 `["科技风", "商务风"]`（可多选）
+当 `mode` 为 `basic` 时，`text` 类型的 input 项**必须**携带：
+- `scene_tags`：场景标签数组，**恰好 1 个**，取值见 `param_detail`
+- `style_tags`：风格标签数组，**恰好 1 个**，取值见 `param_detail`
 
 - `interaction_response` (object, 可选): 用户对交互问卷的回答，与 `input` 互斥。
 结构固定为 `{type, data}`，其中 `type` 和 `data` 的内容因 skill 而异，
 详见 `response_detail` 中各 skill 的说明。
 
-- `options` (object, 可选): 生成选项。当 `task_type` 为 `single_page` 时必须传入，固定为 `{"width": 1280, "height": 720}`。
+- `options` (object, 可选): 生成选项。
+- `task_type=single_page` 时必须传入，固定为 `{"width": 1280, "height": 720}`
+- `task_type=doc_ppt` 且 `mode=basic` 时可选传入 `generate_type`：用户明确要求保持原文 → `2`；否则默认 `3` 或不传
+
+
+### `mode=basic` 经典模式约束
+
+**必填**（写入 `text` 类型 input 项）：
+
+| 字段 | 要求 |
+|---|---|
+| `scene_tags` | 数组，**恰好 1 个**，取值只能来自预置场景列表 |
+| `style_tags` | 数组，**恰好 1 个**，取值只能来自预置风格列表 |
+
+**预置场景**：财务系统、生产管理、教学课件、毕业答辩、培训课件、企业招聘、企业宣传、企业文化、企业培训、党政党建、政府报告、商业计划书、活动策划、营销计划、行业报告、产品发布会、竞聘述职、通用PPT、总结汇报
+
+**预置风格**：简约风、商务风、渐变风、中国风、小清新、可爱卡通、科技风
+
+**分类规则**：用户已指定则映射到最接近预置标签；未指定则内部自动选择（禁止向用户二次确认）；禁止省略字段或传 `[]`。完整流程见 `references/workflows/aippt-full-text.md` 执行流程 B。
+
+**`doc_ppt` 选填** `options.generate_type`：用户明确要求保持原文 → `2`；否则 `3` 或不传。
 
 
 #### 返回值说明
@@ -281,3 +333,36 @@ SSE 流通过 `message` 事件推送步骤状态，最终以 `finish` 事件结�
 |------|------|
 | SSE error 事件 | 包含错误码和描述，检查 task_type 和 input 参数是否正确 |
 | 超时 | 单次调用上限 1800000 毫秒，超时需重新发起 |
+| 云空间已满 | PPT 已成功生成，但云空间不足无法自动保存。响应 `data.pptx_url` 含临时下载链接。根据 `message` 判断是个人还是企业空间，按下方对应模板回复用户 |
+
+#### 云空间已满 — 回复模板
+
+根据 `message` 中包含「个人」还是「企业」选择对应模板。将模板中的 `{主题名}` 替换为实际生成的 PPT 主题，`{下载链接}` 替换为 `data.pptx_url`。
+
+**个人云空间已满：**
+
+```
+✅ {主题名}幻灯片已生成！
+
+💾 暂存提示：您的云空间已满，文件暂时保存在本地
+🔗 临时下载链接（24小时内有效）：[点击下载]({下载链接})
+
+📌 云空间已满，按以下步骤释放空间：
+1. WPS客户端 → 我的 → 云空间管理
+2. 删除不需要的文件
+3. 重新生成PPT，文件将自动同步
+```
+
+**企业云空间已满：**
+
+```
+✅ {主题名}幻灯片已生成！
+
+💾 暂存提示：您的企业云空间已满，文件暂时保存在本地
+🔗 临时下载链接（24小时内有效）：[点击下载]({下载链接})
+
+💡 同步至云端（任选一种）：
+1. 自行清理：前往「WPS客户端 → 我的 → 云空间管理」删除不需要的文件
+2. 申请扩容：联系企业管理员释放空间
+清理/扩容后返回此页面，重新生成PPT，文件将自动同步
+```

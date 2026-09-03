@@ -169,7 +169,7 @@ main() {
   chmod +x "$INSTALL_DIR/$BIN_NAME"
 
   # Record install source for analytics (X-Request-Source header)
-  printf '%s' "skillhub" > "$INSTALL_DIR/.source"
+  printf '%s' "kdocs" > "$INSTALL_DIR/.source"
 
   say "✅ Installed: ${INSTALL_DIR}/${BIN_NAME}"
 

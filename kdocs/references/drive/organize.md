@@ -6,15 +6,15 @@
 
 批量移动文件(夹)。大批量时可能异步，返回非空 `task_ids`。
 
-
-#### 操作约束
+#### 调用约束
 
 - **前置检查**：确认目标文件夹存在（get_file_info）
 - **用户确认**（批量操作（多个 file_ids））：批量移动需向用户确认文件列表和目标位置
 - **后置验证**：get_file_info 确认 parent_id 为目标文件夹
-- **提示**：`task_ids` 非空时，移动尚未完成，需后续确认
 
 **幂等性**：是
+
+> `task_ids` 非空时，移动尚未完成，需后续确认
 
 #### 调用示例
 
@@ -30,7 +30,6 @@
   "dst_parent_id": "string"
 }
 ```
-
 
 #### 参数说明
 
@@ -63,14 +62,12 @@
 
 #### 功能说明
 
-重命名文件（夹）。
+重命名文件（夹）。仅修改文件名，不影响文档内部标题。⚠️ 若用户要改智能文档的「文档标题」，应使用 `otl.block_update`（title 块），而非本工具。
 
 **`drive_id`**（非必填）：
 
 - **有明确的云盘ID** 必传。
 - **没有**：不传。
-
-
 
 **幂等性**：是
 
@@ -95,7 +92,6 @@ file_id：
 }
 ```
 
-
 #### 参数说明
 
 - `drive_id` (string, 可选): 目标云盘 ID
@@ -118,8 +114,6 @@ file_id：
 
 - **有明确的 drive_id** 必传。
 - **没有**：不传。
-
-
 
 **幂等性**：否 — 重复调用会创建多个副本，先确认是否已成功
 
@@ -146,11 +140,12 @@ file_id：
 }
 ```
 
-
 #### 参数说明
 
 - `drive_id` (string, 可选): 源文件所在云盘 ID
-- `file_id` (string, 必填): 源文件 ID
+- `url` (string, 三选一必填: `url` / `link_id` / `file_id`): 文档 URL
+- `link_id` (string, 三选一必填: `url` / `link_id` / `file_id`): 分享链接 ID
+- `file_id` (string, 三选一必填: `url` / `link_id` / `file_id`): 文件 ID
 - `dst_drive_id` (string, 必填): 目标云盘 ID
 - `dst_parent_id` (string, 必填): 目标父目录 ID，根目录为 "0"
 
@@ -188,7 +183,6 @@ file_id：
 
 检查文件名在指定目录下是否已存在。常用于上传、复制、移动等操作前的同名预检查。
 
-
 #### 调用示例
 
 检查文件名是否占用：
@@ -200,7 +194,6 @@ file_id：
   "name": "Q1销售报告.docx"
 }
 ```
-
 
 #### 参数说明
 
@@ -243,8 +236,6 @@ file_id：
 
 与相关工具的区别：`copy_file` 不支持指定目标文件名；`move_file` 源位置不保留；`rename_file` 原地重命名。
 
-
-
 **幂等性**：否 — 重复调用会创建多个副本，先确认是否已成功
 
 > 团队文档库的 dst_drive_id 可先通过 list_doclibs 获取
@@ -276,11 +267,12 @@ file_id：
 }
 ```
 
-
 #### 参数说明
 
 - `drive_id` (string, 可选): 源文件所在云盘 ID
-- `file_id` (string, 必填): 源文件 ID
+- `url` (string, 三选一必填: `url` / `link_id` / `file_id`): 文档 URL
+- `link_id` (string, 三选一必填: `url` / `link_id` / `file_id`): 分享链接 ID
+- `file_id` (string, 三选一必填: `url` / `link_id` / `file_id`): 文件 ID
 - `dst_drive_id` (string, 必填): 目标云盘 ID
 - `dst_parent_id` (string, 必填): 目标父目录 ID，根目录为 "0"
 - `name` (string, 可选): 目标文件名；建议含后缀（如 "副本.docx"）以避免与同名文件冲突
@@ -312,7 +304,3 @@ file_id：
 | `data.parent_id` | string | 新文件父目录 ID |
 | `data.link_id` | string | 分享 link_id（若有） |
 | `data.link_url` | string | 文档打开链接（若有） |
-
-
----
-

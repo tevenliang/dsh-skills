@@ -6,8 +6,6 @@
 
 获取文件的历史版本记录，支持分页。版本记录按修改时间倒序排列。
 
-
-
 #### 调用示例
 
 获取历史版本第一页（含备注）：
@@ -31,11 +29,12 @@
 }
 ```
 
-
 #### 参数说明
 
 - `drive_id` (string, 可选): 目标云盘 ID
-- `file_id` (string, 必填): 文件 ID
+- `url` (string, 三选一必填: `url` / `link_id` / `file_id`): 文档 URL
+- `link_id` (string, 三选一必填: `url` / `link_id` / `file_id`): 分享链接 ID
+- `file_id` (string, 三选一必填: `url` / `link_id` / `file_id`): 文件 ID
 - `page_size` (integer, 可选): 每页版本条数，范围 1–500；默认值：`50`
 - `page_token` (string, 可选): 分页 token，首次不传，后续传上次返回的 `next_page_token`
 - `with_comment` (boolean, 可选): 是否返回版本备注
@@ -93,8 +92,6 @@
 
 获取文件指定历史版本的临时下载地址（`data.url`）。
 
-
-
 > data.url 过期（403/401）时需重新调用本接口获取新 url
 > version_num 无效时接口直接返回业务错误
 
@@ -119,11 +116,12 @@
 }
 ```
 
-
 #### 参数说明
 
 - `drive_id` (string, 可选): 目标云盘 ID
-- `file_id` (string, 必填): 文件 ID
+- `url` (string, 三选一必填: `url` / `link_id` / `file_id`): 文档 URL
+- `link_id` (string, 三选一必填: `url` / `link_id` / `file_id`): 分享链接 ID
+- `file_id` (string, 三选一必填: `url` / `link_id` / `file_id`): 文件 ID
 - `version_num` (integer, 必填): 版本号（来自 list_file_versions 返回的 items[].version）
 
 #### 返回值说明
@@ -148,7 +146,3 @@
 | `data.url` | string | 临时下载地址；有效期较短，获取后应立即发起 GET 请求下载，仍需携带登录凭据 |
 | `data.name` | string | 文件名（含扩展名），可直接用于本地保存 |
 | `data.hashes` | object | 文件哈希信息（如 md5），可用于完整性校验 |
-
-
----
-
