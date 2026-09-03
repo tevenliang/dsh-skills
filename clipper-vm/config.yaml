@@ -39,6 +39,14 @@ summarization:
   temperature: 0.3
   min_chars: 300
 
+# 图片存储 (知识库图片统一上传腾讯 COS, 失败才回退本地)
+# picgo CLI → 腾讯云 COS (bucket steven-crawl-audio, S3 插件 aws-s3)
+image_storage:
+  enabled: true                 # true=PicGo/COS; false=留本地 (旧行为)
+  provider: picgo               # 当前仅 picgo
+  on_failure: fall_back_local   # fall_back_local | fail
+  temp_dir: /tmp/clipper-images # 临时目录 (上传成功即删)
+
 # 抓取延迟 (防风控)
 crawler:
   request_delay: 3

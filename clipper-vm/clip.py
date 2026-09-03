@@ -257,7 +257,7 @@ async def main():
 
     config = load_config()
     vault_root = Path(config.get("vault", "/home/ubuntu/webdav/steven_vault"))
-    publisher = VaultPublisher(vault_root)
+    publisher = VaultPublisher(vault_root, config.get("image_storage", {}))
     transcribe = TranscriptionService(config.get("transcription", {}))
     summarize = SummarizationService(config.get("summarization", {}))
 

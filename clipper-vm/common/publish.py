@@ -4,14 +4,15 @@
 common/publish.py — clipper-vm 出口: vault/00_inbox/MMDD-<safe-title>.md
 
 参考 Mac common-publish/publish_vault.py push():
-  - 图片物化: 复制 images_dir 里的图到 vault/media/<plat>/<author>/,
-    正文里 images/xxx 引用改写为 wikilink ![[media/...]]
+  - 图片存储: 默认 PicGo 上传腾讯 COS 拿 URL, md 写 ![image](https://...)
+    上传失败 → fall_back_local: 复制到 vault/media/<plat>/<author>/, 改写 wikilink
   - 命名: MMDD-<safe-title>.md (用户要求的出口格式)
   - 总结注入: 若提供了 summary, 写入正文顶部 "## 摘要" 小节
 """
 import json
 import re
 import shutil
+import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -22,10 +23,11 @@ from .util import sanitize_filename, mmdd
 class VaultPublisher:
     """发布单条剪藏笔记到 00_inbox"""
 
-    def __init__(self, vault_root):
+    def __init__(self, vault_root, image_storage: dict | None = None):
         self.vault_root = Path(vault_root)
         self.inbox_dir = self.vault_root / "00_inbox"
         self.media_dir = self.vault_root / "media"
+        self.image_storage = image_storage or {}
         # 去重缓存 (相同 platform:item_id 不重复发布)
         self.cache_path = Path.home() / ".agents/state/clipper-vm-cache.json"
         self._cache = self._load_cache()
@@ -54,21 +56,77 @@ class VaultPublisher:
         }
         self._save_cache()
 
-    # ── 图片物化 ─────────────────────────────────────────────
+    # ── 图片存储 (COS 优先, 本地兜底) ──────────────────────
 
-    def _materialize_images(self, platform: str, author: str, md_text: str,
-                            images_dir) -> str:
-        """把 images/xxx 引用物化到 vault/media/<plat>/<author>/, 改写为 wikilink。
+    def _handle_images(self, platform: str, author: str, md_text: str,
+                       images_dir) -> str:
+        """处理 md 里的图片引用。
+
+        默认: PicGo 上传腾讯 COS → ![image](https://...) URL
+        upload 失败或 image_storage.enabled=false:
+            fall_back_local → 复制到 vault/media/<plat>/<author>/, 改写 wikilink
 
         Returns: 改写后的 md 文本
         """
         if not images_dir or not Path(images_dir).exists():
             return md_text
 
+        img_re = re.compile(r'!\[([^\]]*)\]\((images/[^)\s]+)\)')
+        matches = list(img_re.finditer(md_text))
+        if not matches:
+            return md_text
+
+        use_cos = (self.image_storage.get("enabled", True)
+                   and self.image_storage.get("provider") == "picgo")
+        on_failure = self.image_storage.get("on_failure", "fall_back_local")
+
+        # 收集需要上传的文件列表 (去重)
+        src_files = []
+        for m in matches:
+            src = Path(images_dir) / Path(m.group(2)).name
+            if src.exists() and src not in src_files:
+                src_files.append(src)
+
+        url_map = {}  # src.name -> url
+        if use_cos and src_files:
+            # 先复制到临时目录 (统一扩展名风格, 避免 picgo 对中文名/特殊字符问题)
+            temp_dir = Path(self.image_storage.get("temp_dir", "/tmp/clipper-images"))
+            temp_dir.mkdir(parents=True, exist_ok=True)
+            temp_files = []       # 上传对象列表
+            temp_to_src = {}      # str(tmp) -> src.name
+            for src in src_files:
+                ext = src.suffix or ".jpg"
+                tmp = temp_dir / f"{uuid.uuid4().hex}{ext}"
+                try:
+                    shutil.copy2(src, tmp)
+                    temp_files.append(tmp)
+                    temp_to_src[str(tmp)] = src.name
+                except Exception as e:
+                    print(f"      ⚠️ 复制到临时目录失败: {src.name}: {e}")
+
+            if temp_files:
+                from .picgo_uploader import upload_paths
+                success_urls, failed_paths = upload_paths(temp_files)
+                # success_urls[i] 严格对应 temp_files[i] (picgo_uploader 顺序保证)
+                uploaded_tmp = set()
+                for i, tmp in enumerate(temp_files):
+                    url = success_urls[i] if i < len(success_urls) else ""
+                    if url:
+                        orig_name = temp_to_src.get(str(tmp), tmp.name)
+                        url_map[orig_name] = url
+                        uploaded_tmp.add(str(tmp))
+                # 删除已上传的临时文件
+                for tmp in temp_files:
+                    if str(tmp) in uploaded_tmp:
+                        try:
+                            tmp.unlink(missing_ok=True)
+                        except Exception:
+                            pass
+                print(f"      📤 COS 上传: {len(url_map)}/{len(src_files)} 张成功")
+
+        # 本地兜底目录
         dest_root = self.media_dir / platform / (author or "unknown")
         dest_root.mkdir(parents=True, exist_ok=True)
-
-        img_re = re.compile(r'!\[([^\]]*)\]\((images/[^)\s]+)\)')
 
         def _rewrite(m):
             alt = m.group(1)
@@ -76,15 +134,27 @@ class VaultPublisher:
             src = Path(images_dir) / Path(rel).name
             if not src.exists():
                 return m.group(0)
+
+            # COS URL 优先
+            url = url_map.get(src.name)
+            if url:
+                return f"![{alt}]({url})"
+
+            # 本地兜底
+            if on_failure == "fail":
+                print(f"      ❌ 图片上传失败 (fail 模式): {src.name}")
+                return m.group(0)
+
             dest = dest_root / src.name
             if dest.exists():
                 dest = dest_root / f"{dest.stem}_{datetime.now().strftime('%H%M%S')}{dest.suffix}"
             try:
-                shutil.copy2(src, dest)
+                if src.resolve() != dest.resolve():
+                    shutil.copy2(src, dest)
                 rel_path = f"media/{platform}/{dest.parent.name}/{dest.name}"
                 return f"![[{rel_path}]]"
             except Exception as e:
-                print(f"      ⚠️ 图片物化失败: {e}")
+                print(f"      ⚠️ 图片本地兜底失败: {e}")
                 return m.group(0)
 
         return img_re.sub(_rewrite, md_text)
@@ -118,7 +188,7 @@ class VaultPublisher:
         text = md_path.read_text(encoding="utf-8")
 
         # 图片物化
-        text = self._materialize_images(platform, author, text, images_dir)
+        text = self._handle_images(platform, author, text, images_dir)
 
         # 检查是否已有同源文件 (frontmatter source_url 相同 → 跳过, 防重复)
         title = title or "untitled"
