@@ -8,7 +8,7 @@ license: MIT
 platforms:
   - macos
   - linux
-last_modified: 2026-07-19 20:10:00
+last_modified: 2026-09-03 12:30:00
 disable-model-invocation: true
 ---
 
@@ -21,7 +21,8 @@ disable-model-invocation: true
 > 全部走 `password_manager.py`（双平台，自动读 `$VAULT` / `platform.system()` 回退）
 
 ```bash
-SCRIPT=~/.agents/skills/password-manager/scripts/password_manager.py
+# ⚠️ 路径勘误：脚本不在 ~/.agents/，在 ~/.dsh/（SKILL.md v3.0.0 原文写错了，下面以实际为准）
+SCRIPT=~/.dsh/skills/password-manager/scripts/password_manager.py
 
 # 查询（关键词搜索，默认显示密码）
 python3 "$SCRIPT" search <关键词>
@@ -41,6 +42,18 @@ python3 "$SCRIPT" add <分类> <服务名>
 # 更新某字段
 python3 "$SCRIPT" update <服务名> <字段名> <新值>
 ```
+
+## 重复检测工作流（用户硬性要求）
+
+当对话中出现**完整的 API Key / 密码 / 账号**时，必须先查 vault，再决定是否写：
+
+1. **调 `/password-manager` skill**（用 skill 的 `search` 命令）—— 查 vault 里有没有这个服务
+2. **如果 vault 已有且 key 完全相同** → 跳过，不需要新增/更新
+3. **如果 vault 没有这个服务** → 调 skill 的 `add` 新增（明文完整保存）
+4. **如果 vault 有但 key 不一样** → 调 skill 的 `update` 更新；如用户未授权更新，先询问
+
+> 严格禁止对 key 做任何截断/掩码再比较（明文存明文比，明文存明文存）。
+> 严格禁止跳过 skill 直接跑 `password_manager.py` shell 命令——所有操作必须走 skill 入口。
 
 ## 安全策略
 

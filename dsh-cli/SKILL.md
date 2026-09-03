@@ -50,6 +50,16 @@ dsh web [options] [args...]
 | `--trusted-host <authority...>` | 额外的 `/api` 浏览器信任围栏接受的 authority（host 或 host:port，可重复） |
 | `-h`, `--help` | 显示帮助 |
 
+### dsh web 端口分配（同一进程，PID 相同）
+
+| 端口 | 绑定地址 | 说明 |
+|------|---------|------|
+| 3080 | 127.0.0.1 (localhost) | 主 web UI，浏览器访问地址 |
+| 3081 | 0.0.0.0 (*) | dsh web **内置局域网口**（默认 port+1，关不掉） |
+| 3082 | 0.0.0.0 (*) | dsh-bridge 等插件的**公网隧道代理端口**（插件开后才有） |
+
+⚠️ **重启只会影响 3080**（主进程），3081/3082 跟着主进程一起重启，无需单独操作。
+
 ## `dsh plugin` 子命令（转发到 pnpm）
 
 `dsh plugin --profile <name> <pnpm 子命令>`，等价于在 profile 目录跑 pnpm。
