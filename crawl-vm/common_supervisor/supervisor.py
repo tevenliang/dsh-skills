@@ -330,7 +330,7 @@ def run_supervised(sub_cmd: list[str], extra_env: dict | None = None, reset: boo
             if _tm:
                 _provider = _tm.group(1).lower()  # "groq" or "bailian"
                 _elapsed = float(_tm.group(2))
-                from state import record_timing
+                from common_supervisor.state import record_timing
                 record_timing(f"transcribe_{_provider}", _elapsed, {"ok": True})
 
             # ── 异常模式匹配 + 恢复决策 ──────────────────────────────────
