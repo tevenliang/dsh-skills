@@ -1,0 +1,53 @@
+# clipper-vm 配置 — 单条/剪藏链路 (独立于 crawl-vm)
+# 入口: vault/01_my_notes/clip.md → 出口: vault/00_inbox/MMDD-<safe-title>.md
+
+# vault 根目录
+vault: /home/ubuntu/webdav/steven_vault
+
+# 代理 (抖音/B站/通用网页走代理; 微信/XHS 直连)
+vm:
+  proxy: http://127.0.0.1:7890
+
+# 平台配置
+platforms:
+  douyin:
+    enabled: true
+    # Cookie 从 Mac douyin_api config.yaml 读取 (TokenManager.douyin.headers.Cookie)
+    cookie_config: /home/ubuntu/.dsh/skills/crawl/ingest-douyin/douyin_api/crawlers/douyin/web/config.yaml
+  bilibili:
+    enabled: true
+    cookie_file: /home/ubuntu/.agents/credentials/ominicrawl/bilibili.txt
+  xiaohongshu:
+    enabled: true
+    cookie_file: /home/ubuntu/.agents/credentials/ominicrawl/xiaohongshu.txt
+  generic:
+    enabled: true
+  wechat:
+    enabled: true
+
+# 转录配置 (Groq 主路径 + bailian 兜底)
+transcription:
+  model: whisper-large-v3
+  proxy: http://127.0.0.1:7890
+  language: zh
+  groq_timeout: 180
+
+# 总结配置 (Groq LLM) — bilibili/douyin/generic 需要总结 (对齐 Mac SUMMARIZE_PLATFORMS)
+summarization:
+  model: qwen/qwen3.8-27b
+  max_tokens: 1024
+  temperature: 0.3
+  min_chars: 300
+
+# 图片存储 (知识库图片统一上传腾讯 COS, 失败才回退本地)
+# picgo CLI → 腾讯云 COS (bucket steven-crawl-audio, S3 插件 aws-s3)
+image_storage:
+  enabled: true                 # true=PicGo/COS; false=留本地 (旧行为)
+  provider: picgo               # 当前仅 picgo
+  on_failure: fall_back_local   # fall_back_local | fail
+  temp_dir: /tmp/clipper-images # 临时目录 (上传成功即删)
+
+# 抓取延迟 (防风控)
+crawler:
+  request_delay: 3
+  max_retries: 3

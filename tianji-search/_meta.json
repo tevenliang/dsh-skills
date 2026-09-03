@@ -1,0 +1,16 @@
+{
+  "name": "tianji-search",
+  "description": "天机商查 - 企业信息查询",
+  "search": true,
+  "requires": {
+    "bins": ["python3"],
+    "env": []
+  },
+  "call": {
+    "kind": "shell",
+    "template": "python3 {skill_dir}/scripts/business_query.py '<QUERY>'",
+    "params": {
+      "query": "string (required)"
+    }
+  }
+}

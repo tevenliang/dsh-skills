@@ -1,0 +1,16 @@
+{
+  "name": "tavily-search",
+  "description": "Tavily AI 搜索 - 英文深度研究搜索",
+  "search": true,
+  "requires": {
+    "bins": ["python3"],
+    "env": ["TAVILY_API_KEY"]
+  },
+  "call": {
+    "kind": "shell",
+    "template": "TAVILY_API_KEY=$TAVILY_API_KEY python3 {skill_dir}/scripts/tavily_search.py '<QUERY>' --depth advanced --max-results 10",
+    "params": {
+      "<QUERY>": "string (required)"
+    }
+  }
+}

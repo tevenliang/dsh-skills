@@ -571,7 +571,7 @@ tags: {tags_json}
         if image_links:
             body += "## 图片\n\n"
             for link in image_links:
-                body += f"![[{link}]]\n\n"
+                body += self._format_image_link(link) + "\n\n"
         
         # 原始链接
         body += "## 链接\n\n"
@@ -626,10 +626,21 @@ tags: [{tags_str}]
         if image_links:
             body += "\n## 图片\n\n"
             for link in image_links:
-                body += f"![[{link}]]\n"
+                body += self._format_image_link(link) + "\n"
         
         return fm + body
     
+    def _format_image_link(self, link: str) -> str:
+        """格式化图片链接 — http 前缀用标准 markdown, 否则用 Obsidian wikilink
+
+        设计: 兼容新旧笔记
+        - COS URL (https://...) → ![image](url) 标准 markdown, 任意渲染器可用
+        - 本地路径 (media/xhs/...) → ![[media/xhs/<file>]] Obsidian wikilink (旧笔记)
+        """
+        if link.startswith(("http://", "https://")):
+            return f"![image]({link})"
+        return f"![[{link}]]"
+
     def _update_hot(
         self,
         platform: str,

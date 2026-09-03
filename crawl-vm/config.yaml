@@ -13,6 +13,8 @@ platforms:
     cookie_file: /home/ubuntu/.agents/credentials/ominicrawl/douyin.txt
     # Cookie 从 config.yaml 的 TokenManager 段读取
     cookie_config: /home/ubuntu/.dsh/skills/crawl/ingest-douyin/douyin_api/crawlers/douyin/web/config.yaml
+    # 只爬最近 N 天发布的视频 (对齐 Mac 版 7 天窗口); 0 = 不过滤(补历史用)
+    recent_days: 7
   bilibili:
     enabled: true
     cookie_file: /home/ubuntu/.agents/credentials/ominicrawl/bilibili.txt
@@ -20,15 +22,14 @@ platforms:
     enabled: true
     cookie_file: /home/ubuntu/.agents/credentials/ominicrawl/xiaohongshu.txt
 
-# 转录配置 (freellmapi 主路径 + Groq fallback)
-# 主路径走 freellmapi localhost:31415 (它内部 router 自动选 groq/cloudflare whisper)
-# Fallback 直连 Groq (需 VPN), 仅当 freellmapi 不可达时启用
+# 转录配置 (Groq 主路径 + 阿里云百炼 bailian 兜底)
+# 主路径直连 Groq whisper (需 VPN 127.0.0.1:7890)
+# Fallback 走 bailian bl speech recognize (fun-asr, 中文长录音 ASR, 无需 VPN)
 transcription:
-  model: whisper-1     # freellmapi 推荐 "whisper-1" 或 "auto" (让 router 决定)
-  proxy: http://127.0.0.1:7890  # Groq fallback 用的 VPN 代理
+  model: whisper-large-v3  # Groq 主路径: whisper-large-v3 / whisper-large-v3-turbo
+  proxy: http://127.0.0.1:7890  # Groq 需要的 VPN 代理
   language: zh
-  freellmapi_timeout: 120  # freellmapi 转录超时 (秒)
-  fallback_to_groq: true   # freellmapi 挂了是否回退到 Groq 直连
+  groq_timeout: 180  # Groq 转录超时 (秒)
 
 # 总结配置 (Groq LLM)
 summarization:
@@ -41,10 +42,23 @@ summarization:
 vm:
   proxy: http://127.0.0.1:7890
 
+# 图片存储 (XHS 图文笔记用, 其他平台暂未启用)
+# 通过 picgo CLI → 腾讯云 COS, 拿到 URL 后 MD 写 ![](url)
+# 失败兜底: fall_back_local → 图片留 vault/media/xhs/, MD 用 wikilink
+image_storage:
+  enabled: true                 # true=PicGo/COS; false=留本地 (旧行为)
+  provider: picgo               # 当前仅 picgo
+  on_failure: fall_back_local   # fall_back_local | fail
+  temp_dir: /tmp/crawl-images   # 临时目录 (上传成功即删)
+
 # 爬虫配置
 crawler:
-  # 同一 IP 请求间隔（秒），防止被风控
-  request_delay: 2
+  # 同一 IP 请求间隔（秒），防止被风控 (2026-09-02 拉长: XHS 曾因 2s 过密触发反爬吊销 cookie)
+  request_delay: 5
+  # 小红书专用间隔 (更保守, xhs-cli 底层 + 列表/详情请求较多)
+  xhs_request_delay: 10
+  # 博主之间间隔（秒）
+  author_delay: 20
   # 最大重试次数
   max_retries: 3
   # 单次最多处理视频数（0 = 不限制）
